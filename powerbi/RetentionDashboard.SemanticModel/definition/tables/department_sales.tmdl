@@ -1,0 +1,56 @@
+table department_sales
+	lineageTag: fe8fb148-dba4-5767-955f-7c879e321cac
+
+	measure 'Department Share of Sales' =
+			DIVIDE (
+			    SUM ( department_sales[sales] ),
+			    CALCULATE ( SUM ( department_sales[sales] ), ALL ( department_sales ) )
+			)
+		formatString: 0.0%
+		lineageTag: 9422ea29-5234-5212-b630-301ac92f5df2
+
+	column department
+		dataType: string
+		lineageTag: 77727031-c764-55ac-b3c5-29c6f0266917
+		summarizeBy: none
+		sourceColumn: department
+
+	column n_households
+		dataType: int64
+		formatString: #,0
+		lineageTag: 3fee9aa3-ad0b-5420-9df8-d14038b67403
+		summarizeBy: none
+		sourceColumn: n_households
+
+	column sales
+		dataType: double
+		formatString: #,0
+		lineageTag: 63d3d664-bba3-5915-885a-fd4ac4617d82
+		summarizeBy: none
+		sourceColumn: sales
+
+	column share_of_sales
+		dataType: double
+		formatString: 0.0%
+		lineageTag: a4492117-9e60-5c33-ac57-e86bd18744e5
+		summarizeBy: none
+		sourceColumn: share_of_sales
+
+	column sales_rank = RANKX ( ALL ( department_sales ), department_sales[sales] )
+		formatString: 0
+		lineageTag: bf0530b7-919d-5d1e-a8ec-85fe4f03be3c
+		summarizeBy: none
+
+	partition department_sales = m
+		mode: import
+		source =
+				let
+				    Source = Csv.Document(File.Contents(DataFolder & "dashboard\department_sales.csv"), [Delimiter = ",", Encoding = 65001, QuoteStyle = QuoteStyle.Csv]),
+				    Headers = Table.PromoteHeaders(Source, [PromoteAllScalars = true]),
+				    // en-US: the CSV files use a dot as the decimal separator, whatever the Windows language
+				    Typed = Table.TransformColumnTypes(Headers, {{"department", type text}, {"n_households", Int64.Type}, {"sales", type number}, {"share_of_sales", type number}}, "en-US")
+				in
+				    Typed
+
+	annotation PBI_ResultType = Table
+

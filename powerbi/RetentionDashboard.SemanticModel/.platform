@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "SemanticModel",
+    "displayName": "RetentionDashboard"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "8e793678-b5dd-4a51-b710-485a3e5ef911"
+  }
+}

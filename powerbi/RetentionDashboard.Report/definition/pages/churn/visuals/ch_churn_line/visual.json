@@ -1,0 +1,81 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.14.0/schema.json",
+  "name": "ch_churn_line",
+  "position": {
+    "x": 24,
+    "y": 204,
+    "z": 5,
+    "height": 300,
+    "width": 480,
+    "tabOrder": 5
+  },
+  "visual": {
+    "visualType": "lineChart",
+    "query": {
+      "queryState": {
+        "Category": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "churn_by_snapshot"
+                    }
+                  },
+                  "Property": "cutoff_week"
+                }
+              },
+              "queryRef": "churn_by_snapshot.cutoff_week",
+              "nativeQueryRef": "cutoff_week",
+              "active": true,
+              "displayName": "Cutoff week"
+            }
+          ]
+        },
+        "Y": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "churn_by_snapshot"
+                    }
+                  },
+                  "Property": "Churn Rate"
+                }
+              },
+              "queryRef": "churn_by_snapshot.Churn Rate",
+              "nativeQueryRef": "Churn Rate",
+              "displayName": "Churn rate"
+            }
+          ]
+        }
+      }
+    },
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'8-week churn rate per snapshot'"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "drillFilterOtherVisuals": true
+  }
+}

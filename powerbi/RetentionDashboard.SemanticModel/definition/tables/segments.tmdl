@@ -1,0 +1,95 @@
+table segments
+	lineageTag: eb9e9af0-b6d0-5f6a-ab7d-1c4e860ba577
+
+	measure 'Number of Households' = SUM ( segments[households] )
+		formatString: #,0
+		lineageTag: bfce113e-8586-5932-b7e2-2109d2b91b70
+
+	measure 'Segment Share of Households' =
+			DIVIDE (
+			    SUM ( segments[households] ),
+			    CALCULATE ( SUM ( segments[households] ), ALL ( segments ) )
+			)
+		formatString: 0%
+		lineageTag: 43328913-b285-523f-9044-10216418a798
+
+	measure 'Segment Share of Sales' =
+			DIVIDE (
+			    SUM ( segments[sales] ),
+			    CALCULATE ( SUM ( segments[sales] ), ALL ( segments ) )
+			)
+		formatString: 0%
+		lineageTag: b17fce80-d030-5f92-a0e3-1be7819c521a
+
+	measure 'Sales per Household' = DIVIDE ( SUM ( segments[sales] ), SUM ( segments[households] ) )
+		formatString: #,0
+		lineageTag: f2d93e69-bdba-5b44-a664-107b93492b81
+
+	column segment
+		dataType: string
+		lineageTag: f1d86993-63c7-5558-a331-db67f0dca686
+		summarizeBy: none
+		sourceColumn: segment
+
+	column households
+		dataType: int64
+		formatString: #,0
+		lineageTag: 72e127ed-f3ab-50e5-82fa-83ce038e010b
+		summarizeBy: none
+		sourceColumn: households
+
+	column sales
+		dataType: double
+		formatString: #,0
+		lineageTag: 4ad94873-c75c-5358-8bca-d9886f58a09d
+		summarizeBy: none
+		sourceColumn: sales
+
+	column median_active_weeks
+		dataType: double
+		formatString: 0
+		lineageTag: 7cfb00ea-2cdb-5012-a845-43da32dd28fc
+		summarizeBy: none
+		sourceColumn: median_active_weeks
+
+	column median_recency_weeks
+		dataType: double
+		formatString: 0
+		lineageTag: 6a304eb1-82ca-5575-8b9e-ad55c5a8f632
+		summarizeBy: none
+		sourceColumn: median_recency_weeks
+
+	column share_of_households
+		dataType: double
+		formatString: 0.0%
+		lineageTag: 0719ccab-74eb-57c7-bf74-9db614cb061c
+		summarizeBy: none
+		sourceColumn: share_of_households
+
+	column share_of_sales
+		dataType: double
+		formatString: 0.0%
+		lineageTag: 4129b1f1-a8fe-57ed-be6a-cd481fd8df9b
+		summarizeBy: none
+		sourceColumn: share_of_sales
+
+	column sales_per_household
+		dataType: double
+		formatString: #,0
+		lineageTag: dd0e7eee-7d27-505f-94f4-06d76f62fe6c
+		summarizeBy: none
+		sourceColumn: sales_per_household
+
+	partition segments = m
+		mode: import
+		source =
+				let
+				    Source = Csv.Document(File.Contents(DataFolder & "dashboard\segments.csv"), [Delimiter = ",", Encoding = 65001, QuoteStyle = QuoteStyle.Csv]),
+				    Headers = Table.PromoteHeaders(Source, [PromoteAllScalars = true]),
+				    // en-US: the CSV files use a dot as the decimal separator, whatever the Windows language
+				    Typed = Table.TransformColumnTypes(Headers, {{"segment", type text}, {"households", Int64.Type}, {"sales", type number}, {"median_active_weeks", type number}, {"median_recency_weeks", type number}, {"share_of_households", type number}, {"share_of_sales", type number}, {"sales_per_household", type number}}, "en-US")
+				in
+				    Typed
+
+	annotation PBI_ResultType = Table
+

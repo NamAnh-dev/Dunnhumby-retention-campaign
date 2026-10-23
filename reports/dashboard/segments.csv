@@ -1,0 +1,6 @@
+segment,households,sales,median_active_weeks,median_recency_weeks,share_of_households,share_of_sales,sales_per_household
+champions,609,3759571.73,77.0,0.0,0.2436,0.4666,6173.3526
+middle,882,2794274.79,51.0,1.0,0.3528,0.3468,3168.112
+at_risk_loyal,155,678934.58,67.0,2.0,0.062,0.0843,4380.2231
+lost,653,581628.1,22.0,5.0,0.2612,0.0722,890.7015
+new_or_light,201,243053.88,28.0,0.0,0.0804,0.0302,1209.2233

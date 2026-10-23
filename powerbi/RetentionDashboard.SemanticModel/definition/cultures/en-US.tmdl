@@ -1,0 +1,619 @@
+cultureInfo en-US
+
+	linguisticMetadata =
+			{
+			  "Version": "2.0.0",
+			  "Language": "en-US",
+			  "Entities": {
+			    "weekly_kpis.week_no": {
+			      "Definition": {
+			        "Binding": {
+			          "ConceptualEntity": "weekly_kpis",
+			          "ConceptualProperty": "week_no"
+			        }
+			      },
+			      "State": "Generated",
+			      "Terms": [
+			        {
+			          "Week": {
+			            "State": "Suggested",
+			            "Source": {
+			              "Type": "External",
+			              "Agent": "PowerBI.VisualColumnRename"
+			            },
+			            "Weight": 0.9
+			          }
+			        }
+			      ]
+			    },
+			    "weekly_kpis.active_households": {
+			      "Definition": {
+			        "Binding": {
+			          "ConceptualEntity": "weekly_kpis",
+			          "ConceptualProperty": "Active Households"
+			        }
+			      },
+			      "State": "Generated",
+			      "Terms": [
+			        {
+			          "Active households": {
+			            "State": "Suggested",
+			            "Source": {
+			              "Type": "External",
+			              "Agent": "PowerBI.VisualColumnRename"
+			            },
+			            "Weight": 0.9
+			          }
+			        },
+			        {
+			          "Active households (median per week)": {
+			            "State": "Suggested",
+			            "Source": {
+			              "Type": "External",
+			              "Agent": "PowerBI.VisualColumnRename"
+			            },
+			            "Weight": 0.9
+			          }
+			        }
+			      ]
+			    },
+			    "weekly_kpis.basket_value": {
+			      "Definition": {
+			        "Binding": {
+			          "ConceptualEntity": "weekly_kpis",
+			          "ConceptualProperty": "Basket Value"
+			        }
+			      },
+			      "State": "Generated",
+			      "Terms": [
+			        {
+			          "Basket value": {
+			            "State": "Suggested",
+			            "Source": {
+			              "Type": "External",
+			              "Agent": "PowerBI.VisualColumnRename"
+			            },
+			            "Weight": 0.9
+			          }
+			        }
+			      ]
+			    },
+			    "weekly_kpis.net_sales": {
+			      "Definition": {
+			        "Binding": {
+			          "ConceptualEntity": "weekly_kpis",
+			          "ConceptualProperty": "Net Sales"
+			        }
+			      },
+			      "State": "Generated",
+			      "Terms": [
+			        {
+			          "Net sales": {
+			            "State": "Suggested",
+			            "Source": {
+			              "Type": "External",
+			              "Agent": "PowerBI.VisualColumnRename"
+			            },
+			            "Weight": 0.9
+			          }
+			        }
+			      ]
+			    },
+			    "period_retention.retention_rate": {
+			      "Definition": {
+			        "Binding": {
+			          "ConceptualEntity": "period_retention",
+			          "ConceptualProperty": "Retention Rate"
+			        }
+			      },
+			      "State": "Generated",
+			      "Terms": [
+			        {
+			          "4-week retention": {
+			            "State": "Suggested",
+			            "Source": {
+			              "Type": "External",
+			              "Agent": "PowerBI.VisualColumnRename"
+			            },
+			            "Weight": 0.9
+			          }
+			        },
+			        {
+			          "Retention rate": {
+			            "State": "Suggested",
+			            "Source": {
+			              "Type": "External",
+			              "Agent": "PowerBI.VisualColumnRename"
+			            },
+			            "Weight": 0.9
+			          }
+			        }
+			      ]
+			    },
+			    "period_retention.period": {
+			      "Definition": {
+			        "Binding": {
+			          "ConceptualEntity": "period_retention",
+			          "ConceptualProperty": "period"
+			        }
+			      },
+			      "State": "Generated",
+			      "Terms": [
+			        {
+			          "4-week period": {
+			            "State": "Suggested",
+			            "Source": {
+			              "Type": "External",
+			              "Agent": "PowerBI.VisualColumnRename"
+			            },
+			            "Weight": 0.9
+			          }
+			        }
+			      ]
+			    },
+			    "department_sales.department": {
+			      "Definition": {
+			        "Binding": {
+			          "ConceptualEntity": "department_sales",
+			          "ConceptualProperty": "department"
+			        }
+			      },
+			      "State": "Generated",
+			      "Terms": [
+			        {
+			          "Department": {
+			            "State": "Suggested",
+			            "Source": {
+			              "Type": "External",
+			              "Agent": "PowerBI.VisualColumnRename"
+			            },
+			            "Weight": 0.9
+			          }
+			        }
+			      ]
+			    },
+			    "department_sales.department_share_of_sales": {
+			      "Definition": {
+			        "Binding": {
+			          "ConceptualEntity": "department_sales",
+			          "ConceptualProperty": "Department Share of Sales"
+			        }
+			      },
+			      "State": "Generated",
+			      "Terms": [
+			        {
+			          "Share of sales": {
+			            "State": "Suggested",
+			            "Source": {
+			              "Type": "External",
+			              "Agent": "PowerBI.VisualColumnRename"
+			            },
+			            "Weight": 0.9
+			          }
+			        }
+			      ]
+			    },
+			    "dim_week.week_no": {
+			      "Definition": {
+			        "Binding": {
+			          "ConceptualEntity": "dim_week",
+			          "ConceptualProperty": "week_no"
+			        }
+			      },
+			      "State": "Generated",
+			      "Terms": [
+			        {
+			          "Week": {
+			            "State": "Suggested",
+			            "Source": {
+			              "Type": "External",
+			              "Agent": "PowerBI.VisualColumnRename"
+			            },
+			            "Weight": 0.9
+			          }
+			        }
+			      ]
+			    },
+			    "segments.segment": {
+			      "Definition": {
+			        "Binding": {
+			          "ConceptualEntity": "segments",
+			          "ConceptualProperty": "segment"
+			        }
+			      },
+			      "State": "Generated",
+			      "Terms": [
+			        {
+			          "Segment": {
+			            "State": "Suggested",
+			            "Source": {
+			              "Type": "External",
+			              "Agent": "PowerBI.VisualColumnRename"
+			            },
+			            "Weight": 0.9
+			          }
+			        }
+			      ]
+			    },
+			    "segments.segment_share_of_households": {
+			      "Definition": {
+			        "Binding": {
+			          "ConceptualEntity": "segments",
+			          "ConceptualProperty": "Segment Share of Households"
+			        }
+			      },
+			      "State": "Generated",
+			      "Terms": [
+			        {
+			          "Share of households": {
+			            "State": "Suggested",
+			            "Source": {
+			              "Type": "External",
+			              "Agent": "PowerBI.VisualColumnRename"
+			            },
+			            "Weight": 0.9
+			          }
+			        }
+			      ]
+			    },
+			    "segments.segment_share_of_sales": {
+			      "Definition": {
+			        "Binding": {
+			          "ConceptualEntity": "segments",
+			          "ConceptualProperty": "Segment Share of Sales"
+			        }
+			      },
+			      "State": "Generated",
+			      "Terms": [
+			        {
+			          "Share of sales": {
+			            "State": "Suggested",
+			            "Source": {
+			              "Type": "External",
+			              "Agent": "PowerBI.VisualColumnRename"
+			            },
+			            "Weight": 0.9
+			          }
+			        }
+			      ]
+			    },
+			    "segments.number_of_households": {
+			      "Definition": {
+			        "Binding": {
+			          "ConceptualEntity": "segments",
+			          "ConceptualProperty": "Number of Households"
+			        }
+			      },
+			      "State": "Generated",
+			      "Terms": [
+			        {
+			          "Households": {
+			            "State": "Suggested",
+			            "Source": {
+			              "Type": "External",
+			              "Agent": "PowerBI.VisualColumnRename"
+			            },
+			            "Weight": 0.9
+			          }
+			        }
+			      ]
+			    },
+			    "segments.sales_per_household": {
+			      "Definition": {
+			        "Binding": {
+			          "ConceptualEntity": "segments",
+			          "ConceptualProperty": "Sales per Household"
+			        }
+			      },
+			      "State": "Generated",
+			      "Terms": [
+			        {
+			          "Sales / household": {
+			            "State": "Suggested",
+			            "Source": {
+			              "Type": "External",
+			              "Agent": "PowerBI.VisualColumnRename"
+			            },
+			            "Weight": 0.9
+			          }
+			        }
+			      ]
+			    },
+			    "segments.median_active_weeks": {
+			      "Definition": {
+			        "Binding": {
+			          "ConceptualEntity": "segments",
+			          "ConceptualProperty": "median_active_weeks"
+			        }
+			      },
+			      "State": "Generated",
+			      "Terms": [
+			        {
+			          "Active weeks": {
+			            "State": "Suggested",
+			            "Source": {
+			              "Type": "External",
+			              "Agent": "PowerBI.VisualColumnRename"
+			            },
+			            "Weight": 0.9
+			          }
+			        }
+			      ]
+			    },
+			    "segments.median_recency_weeks": {
+			      "Definition": {
+			        "Binding": {
+			          "ConceptualEntity": "segments",
+			          "ConceptualProperty": "median_recency_weeks"
+			        }
+			      },
+			      "State": "Generated",
+			      "Terms": [
+			        {
+			          "Weeks since last buy": {
+			            "State": "Suggested",
+			            "Source": {
+			              "Type": "External",
+			              "Agent": "PowerBI.VisualColumnRename"
+			            },
+			            "Weight": 0.9
+			          }
+			        }
+			      ]
+			    },
+			    "churn_by_snapshot.churn_change_pts": {
+			      "Definition": {
+			        "Binding": {
+			          "ConceptualEntity": "churn_by_snapshot",
+			          "ConceptualProperty": "Churn Change (pts)"
+			        }
+			      },
+			      "State": "Generated",
+			      "Terms": [
+			        {
+			          "Change vs week 86 (percentage points)": {
+			            "State": "Suggested",
+			            "Source": {
+			              "Type": "External",
+			              "Agent": "PowerBI.VisualColumnRename"
+			            },
+			            "Weight": 0.9
+			          }
+			        }
+			      ]
+			    },
+			    "churn_by_snapshot.latest_churn_rate": {
+			      "Definition": {
+			        "Binding": {
+			          "ConceptualEntity": "churn_by_snapshot",
+			          "ConceptualProperty": "Latest Churn Rate"
+			        }
+			      },
+			      "State": "Generated",
+			      "Terms": [
+			        {
+			          "Churn rate (week 94)": {
+			            "State": "Suggested",
+			            "Source": {
+			              "Type": "External",
+			              "Agent": "PowerBI.VisualColumnRename"
+			            },
+			            "Weight": 0.9
+			          }
+			        }
+			      ]
+			    },
+			    "churn_by_snapshot.cutoff_week": {
+			      "Definition": {
+			        "Binding": {
+			          "ConceptualEntity": "churn_by_snapshot",
+			          "ConceptualProperty": "cutoff_week"
+			        }
+			      },
+			      "State": "Generated",
+			      "Terms": [
+			        {
+			          "Cutoff week": {
+			            "State": "Suggested",
+			            "Source": {
+			              "Type": "External",
+			              "Agent": "PowerBI.VisualColumnRename"
+			            },
+			            "Weight": 0.9
+			          }
+			        }
+			      ]
+			    },
+			    "churn_by_snapshot.churn_rate": {
+			      "Definition": {
+			        "Binding": {
+			          "ConceptualEntity": "churn_by_snapshot",
+			          "ConceptualProperty": "Churn Rate"
+			        }
+			      },
+			      "State": "Generated",
+			      "Terms": [
+			        {
+			          "Churn rate": {
+			            "State": "Suggested",
+			            "Source": {
+			              "Type": "External",
+			              "Agent": "PowerBI.VisualColumnRename"
+			            },
+			            "Weight": 0.9
+			          }
+			        }
+			      ]
+			    },
+			    "coupon_list.households_on_list": {
+			      "Definition": {
+			        "Binding": {
+			          "ConceptualEntity": "coupon_list",
+			          "ConceptualProperty": "Households on List"
+			        }
+			      },
+			      "State": "Generated",
+			      "Terms": [
+			        {
+			          "Households on the coupon list": {
+			            "State": "Suggested",
+			            "Source": {
+			              "Type": "External",
+			              "Agent": "PowerBI.VisualColumnRename"
+			            },
+			            "Weight": 0.9
+			          }
+			        }
+			      ]
+			    },
+			    "coupon_list.expected_sales_lost": {
+			      "Definition": {
+			        "Binding": {
+			          "ConceptualEntity": "coupon_list",
+			          "ConceptualProperty": "Expected Sales Lost"
+			        }
+			      },
+			      "State": "Generated",
+			      "Terms": [
+			        {
+			          "Expected sales lost on the list": {
+			            "State": "Suggested",
+			            "Source": {
+			              "Type": "External",
+			              "Agent": "PowerBI.VisualColumnRename"
+			            },
+			            "Weight": 0.9
+			          }
+			        }
+			      ]
+			    },
+			    "coupon_list.household_key": {
+			      "Definition": {
+			        "Binding": {
+			          "ConceptualEntity": "coupon_list",
+			          "ConceptualProperty": "household_key"
+			        }
+			      },
+			      "State": "Generated",
+			      "Terms": [
+			        {
+			          "Household": {
+			            "State": "Suggested",
+			            "Source": {
+			              "Type": "External",
+			              "Agent": "PowerBI.VisualColumnRename"
+			            },
+			            "Weight": 0.9
+			          }
+			        }
+			      ]
+			    },
+			    "coupon_list.churn_probability": {
+			      "Definition": {
+			        "Binding": {
+			          "ConceptualEntity": "coupon_list",
+			          "ConceptualProperty": "churn_probability"
+			        }
+			      },
+			      "State": "Generated",
+			      "Terms": [
+			        {
+			          "Churn risk": {
+			            "State": "Suggested",
+			            "Source": {
+			              "Type": "External",
+			              "Agent": "PowerBI.VisualColumnRename"
+			            },
+			            "Weight": 0.9
+			          }
+			        }
+			      ]
+			    },
+			    "coupon_list.sales_12w": {
+			      "Definition": {
+			        "Binding": {
+			          "ConceptualEntity": "coupon_list",
+			          "ConceptualProperty": "sales_12w"
+			        }
+			      },
+			      "State": "Generated",
+			      "Terms": [
+			        {
+			          "Sales (12 wk)": {
+			            "State": "Suggested",
+			            "Source": {
+			              "Type": "External",
+			              "Agent": "PowerBI.VisualColumnRename"
+			            },
+			            "Weight": 0.9
+			          }
+			        }
+			      ]
+			    },
+			    "coupon_list.expected_sales_lost1": {
+			      "Definition": {
+			        "Binding": {
+			          "ConceptualEntity": "coupon_list",
+			          "ConceptualProperty": "expected_sales_lost"
+			        }
+			      },
+			      "State": "Generated",
+			      "Terms": [
+			        {
+			          "Expected loss": {
+			            "State": "Suggested",
+			            "Source": {
+			              "Type": "External",
+			              "Agent": "PowerBI.VisualColumnRename"
+			            },
+			            "Weight": 0.9
+			          }
+			        }
+			      ]
+			    },
+			    "coupon_list.recency_weeks": {
+			      "Definition": {
+			        "Binding": {
+			          "ConceptualEntity": "coupon_list",
+			          "ConceptualProperty": "recency_weeks"
+			        }
+			      },
+			      "State": "Generated",
+			      "Terms": [
+			        {
+			          "Weeks silent": {
+			            "State": "Suggested",
+			            "Source": {
+			              "Type": "External",
+			              "Agent": "PowerBI.VisualColumnRename"
+			            },
+			            "Weight": 0.9
+			          }
+			        }
+			      ]
+			    },
+			    "coupon_list.active_weeks_12w": {
+			      "Definition": {
+			        "Binding": {
+			          "ConceptualEntity": "coupon_list",
+			          "ConceptualProperty": "active_weeks_12w"
+			        }
+			      },
+			      "State": "Generated",
+			      "Terms": [
+			        {
+			          "Active weeks (12 wk)": {
+			            "State": "Suggested",
+			            "Source": {
+			              "Type": "External",
+			              "Agent": "PowerBI.VisualColumnRename"
+			            },
+			            "Weight": 0.9
+			          }
+			        }
+			      ]
+			    }
+			  }
+			}
+		contentType: json
+

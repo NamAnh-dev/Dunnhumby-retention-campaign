@@ -1,0 +1,39 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.7.0/schema.json",
+  "name": "ov_card_basket",
+  "position": {
+    "x": 644,
+    "y": 92,
+    "z": 4,
+    "width": 302,
+    "height": 84,
+    "tabOrder": 4
+  },
+  "visual": {
+    "visualType": "card",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "weekly_kpis"
+                    }
+                  },
+                  "Property": "Basket Value"
+                }
+              },
+              "queryRef": "weekly_kpis.Basket Value",
+              "nativeQueryRef": "Basket Value",
+              "displayName": "Basket value"
+            }
+          ]
+        }
+      }
+    },
+    "drillFilterOtherVisuals": true
+  }
+}

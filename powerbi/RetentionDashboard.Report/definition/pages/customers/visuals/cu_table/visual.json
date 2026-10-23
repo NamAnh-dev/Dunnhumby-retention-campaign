@@ -1,0 +1,138 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.14.0/schema.json",
+  "name": "cu_table",
+  "position": {
+    "x": 660,
+    "y": 96,
+    "z": 2,
+    "height": 200,
+    "width": 596,
+    "tabOrder": 2
+  },
+  "visual": {
+    "visualType": "tableEx",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "segments"
+                    }
+                  },
+                  "Property": "segment"
+                }
+              },
+              "queryRef": "segments.segment",
+              "nativeQueryRef": "segment",
+              "displayName": "Segment"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "segments"
+                    }
+                  },
+                  "Property": "Number of Households"
+                }
+              },
+              "queryRef": "segments.Number of Households",
+              "nativeQueryRef": "Number of Households",
+              "displayName": "Households"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "segments"
+                    }
+                  },
+                  "Property": "Sales per Household"
+                }
+              },
+              "queryRef": "segments.Sales per Household",
+              "nativeQueryRef": "Sales per Household",
+              "displayName": "Sales / household"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "segments"
+                    }
+                  },
+                  "Property": "median_active_weeks"
+                }
+              },
+              "queryRef": "segments.median_active_weeks",
+              "nativeQueryRef": "median_active_weeks",
+              "displayName": "Active weeks"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "segments"
+                    }
+                  },
+                  "Property": "median_recency_weeks"
+                }
+              },
+              "queryRef": "segments.median_recency_weeks",
+              "nativeQueryRef": "median_recency_weeks",
+              "displayName": "Weeks since last buy"
+            }
+          ]
+        }
+      },
+      "sortDefinition": {
+        "sort": [
+          {
+            "field": {
+              "Measure": {
+                "Expression": {
+                  "SourceRef": {
+                    "Entity": "segments"
+                  }
+                },
+                "Property": "Sales per Household"
+              }
+            },
+            "direction": "Descending"
+          }
+        ]
+      }
+    },
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Segment table (weeks are medians)'"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "drillFilterOtherVisuals": true
+  }
+}

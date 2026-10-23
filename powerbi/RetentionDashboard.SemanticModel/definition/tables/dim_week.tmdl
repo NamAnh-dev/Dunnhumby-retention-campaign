@@ -1,0 +1,34 @@
+table dim_week
+	lineageTag: c4cc359d-3264-5b03-9805-c185aace8e07
+
+	column week_no
+		formatString: 0
+		lineageTag: 15685651-ef16-50cc-beee-0eb268a2dbac
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [week_no]
+
+	column period
+		formatString: 0
+		lineageTag: cf124a67-ceb8-5bda-95dd-22060290578f
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [period]
+
+	column phase
+		lineageTag: 53884a5e-35f9-5d1d-9f0b-ff4daba2915b
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [phase]
+
+	partition dim_week = calculated
+		mode: import
+		source =
+				// One row per week. period = the 4-week period used by the retention table.
+				SELECTCOLUMNS (
+				    GENERATESERIES ( 1, COALESCE ( MAX ( weekly_kpis[week_no] ), 0 ), 1 ),
+				    "week_no", [Value],
+				    "period", INT ( ( [Value] - 1 ) / 4 ) + 1,
+				    "phase", IF ( [Value] <= 17, "warm-up", "after warm-up" )
+				)
+
