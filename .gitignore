@@ -1,0 +1,30 @@
+# Data: never commit raw or generated data (Kaggle license + file size)
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+.venv/
+venv/
+*.egg-info/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Secrets
+.env
+
+# Trained models (re-create with python -m src.train)
+models/
+
+# Power BI project: local settings and the data cache stay on this computer
+**/.pbi/localSettings.json
+**/.pbi/cache.abf
