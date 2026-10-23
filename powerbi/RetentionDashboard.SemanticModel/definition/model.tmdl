@@ -10,6 +10,8 @@ annotation __PBI_TimeIntelligenceEnabled = 0
 
 annotation PBI_ProTooling = ["DevMode"]
 
+annotation PBI_QueryOrder = ["churn_by_snapshot","coupon_list","department_sales","period_retention","segments","weekly_kpis","DataFolder"]
+
 ref table churn_by_snapshot
 ref table coupon_list
 ref table department_sales

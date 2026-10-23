@@ -77,5 +77,37 @@
       ]
     },
     "drillFilterOtherVisuals": true
+  },
+  "filterConfig": {
+    "filters": [
+      {
+        "name": "878bfddd7bd5ebb00d3d",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "churn_by_snapshot"
+              }
+            },
+            "Property": "cutoff_week"
+          }
+        },
+        "type": "Advanced"
+      },
+      {
+        "name": "0f9417480d6aa80befbd",
+        "field": {
+          "Measure": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "churn_by_snapshot"
+              }
+            },
+            "Property": "Churn Rate"
+          }
+        },
+        "type": "Advanced"
+      }
+    ]
   }
 }
