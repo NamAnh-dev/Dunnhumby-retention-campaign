@@ -1,0 +1,39 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.7.0/schema.json",
+  "name": "ov_card_active",
+  "position": {
+    "x": 334,
+    "y": 92,
+    "z": 3,
+    "width": 302,
+    "height": 84,
+    "tabOrder": 3
+  },
+  "visual": {
+    "visualType": "card",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "weekly_kpis"
+                    }
+                  },
+                  "Property": "Active Households"
+                }
+              },
+              "queryRef": "weekly_kpis.Active Households",
+              "nativeQueryRef": "Active Households",
+              "displayName": "Active households (median per week)"
+            }
+          ]
+        }
+      }
+    },
+    "drillFilterOtherVisuals": true
+  }
+}

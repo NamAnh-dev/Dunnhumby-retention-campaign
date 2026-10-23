@@ -1,0 +1,63 @@
+table churn_by_snapshot
+	lineageTag: 9e8163c6-9ed4-5eb5-97fb-1eb5d2315020
+
+	/// Share of at-risk households (bought in the last 12 weeks) with no purchase in the next 8 weeks.
+	measure 'Churn Rate' =
+			DIVIDE (
+			    SUMX ( churn_by_snapshot, churn_by_snapshot[churn_rate] * churn_by_snapshot[households_at_risk] ),
+			    SUM ( churn_by_snapshot[households_at_risk] )
+			)
+		formatString: 0.0%
+		lineageTag: ef8716af-e2ab-5915-a626-c96b1547186d
+
+	measure 'Latest Churn Rate' =
+			VAR LastWeek = MAX ( churn_by_snapshot[cutoff_week] )
+			RETURN
+			    CALCULATE ( [Churn Rate], churn_by_snapshot[cutoff_week] = LastWeek )
+		formatString: 0.0%
+		lineageTag: d34a85a8-f4d4-5833-bfe8-57763cd42cf6
+
+	measure 'Churn Change (pts)' =
+			VAR LastWeek = MAX ( churn_by_snapshot[cutoff_week] )
+			VAR PreviousWeek = CALCULATE ( MAX ( churn_by_snapshot[cutoff_week] ), churn_by_snapshot[cutoff_week] < LastWeek )
+			VAR LastRate = CALCULATE ( [Churn Rate], churn_by_snapshot[cutoff_week] = LastWeek )
+			VAR PreviousRate = CALCULATE ( [Churn Rate], churn_by_snapshot[cutoff_week] = PreviousWeek )
+			RETURN
+			    ( LastRate - PreviousRate ) * 100
+		formatString: +0.0;-0.0;0.0
+		lineageTag: f2ba0fe4-5dc7-5438-822e-6c4174e0c9e9
+
+	column cutoff_week
+		dataType: int64
+		formatString: 0
+		lineageTag: 93c78c2b-8590-5eef-9773-4437a74a66b3
+		summarizeBy: none
+		sourceColumn: cutoff_week
+
+	column households_at_risk
+		dataType: int64
+		formatString: #,0
+		lineageTag: f68a91ad-6247-5de9-9a6b-befe239f55a4
+		summarizeBy: none
+		sourceColumn: households_at_risk
+
+	column churn_rate
+		dataType: double
+		formatString: 0.0%
+		lineageTag: 620b95c3-8d17-5b2a-88d0-64ad17788886
+		summarizeBy: none
+		sourceColumn: churn_rate
+
+	partition churn_by_snapshot = m
+		mode: import
+		source =
+				let
+				    Source = Csv.Document(File.Contents(DataFolder & "dashboard\churn_by_snapshot.csv"), [Delimiter = ",", Encoding = 65001, QuoteStyle = QuoteStyle.Csv]),
+				    Headers = Table.PromoteHeaders(Source, [PromoteAllScalars = true]),
+				    // en-US: the CSV files use a dot as the decimal separator, whatever the Windows language
+				    Typed = Table.TransformColumnTypes(Headers, {{"cutoff_week", Int64.Type}, {"households_at_risk", Int64.Type}, {"churn_rate", type number}}, "en-US")
+				in
+				    Typed
+
+	annotation PBI_ResultType = Table
+

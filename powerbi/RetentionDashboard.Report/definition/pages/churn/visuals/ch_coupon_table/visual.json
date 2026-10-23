@@ -1,0 +1,153 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.14.0/schema.json",
+  "name": "ch_coupon_table",
+  "position": {
+    "x": 520,
+    "y": 204,
+    "z": 6,
+    "height": 504,
+    "width": 736,
+    "tabOrder": 6
+  },
+  "visual": {
+    "visualType": "tableEx",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "coupon_list"
+                    }
+                  },
+                  "Property": "household_key"
+                }
+              },
+              "queryRef": "coupon_list.household_key",
+              "nativeQueryRef": "household_key",
+              "displayName": "Household"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "coupon_list"
+                    }
+                  },
+                  "Property": "churn_probability"
+                }
+              },
+              "queryRef": "coupon_list.churn_probability",
+              "nativeQueryRef": "churn_probability",
+              "displayName": "Churn risk"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "coupon_list"
+                    }
+                  },
+                  "Property": "sales_12w"
+                }
+              },
+              "queryRef": "coupon_list.sales_12w",
+              "nativeQueryRef": "sales_12w",
+              "displayName": "Sales (12 wk)"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "coupon_list"
+                    }
+                  },
+                  "Property": "expected_sales_lost"
+                }
+              },
+              "queryRef": "coupon_list.expected_sales_lost",
+              "nativeQueryRef": "expected_sales_lost",
+              "displayName": "Expected loss"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "coupon_list"
+                    }
+                  },
+                  "Property": "recency_weeks"
+                }
+              },
+              "queryRef": "coupon_list.recency_weeks",
+              "nativeQueryRef": "recency_weeks",
+              "displayName": "Weeks silent"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "coupon_list"
+                    }
+                  },
+                  "Property": "active_weeks_12w"
+                }
+              },
+              "queryRef": "coupon_list.active_weeks_12w",
+              "nativeQueryRef": "active_weeks_12w",
+              "displayName": "Active weeks (12 wk)"
+            }
+          ]
+        }
+      },
+      "sortDefinition": {
+        "sort": [
+          {
+            "field": {
+              "Column": {
+                "Expression": {
+                  "SourceRef": {
+                    "Entity": "coupon_list"
+                  }
+                },
+                "Property": "expected_sales_lost"
+              }
+            },
+            "direction": "Descending"
+          }
+        ]
+      }
+    },
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Coupon list (highest expected sales lost first)'"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "drillFilterOtherVisuals": true
+  }
+}

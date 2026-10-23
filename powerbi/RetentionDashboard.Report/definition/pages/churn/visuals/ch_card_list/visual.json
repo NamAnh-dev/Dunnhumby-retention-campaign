@@ -1,0 +1,39 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.7.0/schema.json",
+  "name": "ch_card_list",
+  "position": {
+    "x": 644,
+    "y": 96,
+    "z": 3,
+    "width": 302,
+    "height": 96,
+    "tabOrder": 3
+  },
+  "visual": {
+    "visualType": "card",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "coupon_list"
+                    }
+                  },
+                  "Property": "Households on List"
+                }
+              },
+              "queryRef": "coupon_list.Households on List",
+              "nativeQueryRef": "Households on List",
+              "displayName": "Households on the coupon list"
+            }
+          ]
+        }
+      }
+    },
+    "drillFilterOtherVisuals": true
+  }
+}

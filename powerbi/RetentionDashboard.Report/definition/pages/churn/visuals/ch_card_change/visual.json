@@ -1,0 +1,39 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.7.0/schema.json",
+  "name": "ch_card_change",
+  "position": {
+    "x": 334,
+    "y": 96,
+    "z": 2,
+    "width": 302,
+    "height": 96,
+    "tabOrder": 2
+  },
+  "visual": {
+    "visualType": "card",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "churn_by_snapshot"
+                    }
+                  },
+                  "Property": "Churn Change (pts)"
+                }
+              },
+              "queryRef": "churn_by_snapshot.Churn Change (pts)",
+              "nativeQueryRef": "Churn Change (pts)",
+              "displayName": "Change vs week 86 (percentage points)"
+            }
+          ]
+        }
+      }
+    },
+    "drillFilterOtherVisuals": true
+  }
+}
