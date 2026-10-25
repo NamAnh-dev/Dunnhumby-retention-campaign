@@ -122,7 +122,8 @@ One week has few churners, so the table shows the test week and, in brackets, th
 
 1. **Send coupons by expected sales lost** (churn risk × recent sales). It finds fewer churners, but the ones who matter most for revenue: about 2.4x more of the sales at risk than ranking by risk alone. Against a simple rule × sales, the model finds more churners on both weeks; on sales it is ahead on test and level on validation, so that gain is not proven yet.
    Most of the list would not churn anyway (83%): for them the coupon is only a discount.
-2. **Run an A/B test before rollout:** give the coupon to a random half of the list and compare churn after 8 weeks. This data cannot tell how many churners a coupon really keeps.
+2. **Check the break-even, then run an A/B test before rollout.** A coupon pays off when it costs less than *r* × 31 per household, where *r* = the share of churners it keeps (unknown: a coupon of 2 pays off even at *r* = 10%, a coupon of 10 does not even at 30%).
+   To measure *r*, give the coupon to a random half of the list and compare churn after 8 weeks. To detect a 5-point drop (17% → 12%) the test needs about **788 households per group**, so about **7 weekly lists** of 231 households: one week is far too small.
 3. **Watch the churn rate:** it rose from 6.8% (week 86) to 8.2% (week 94). Track it every week and retrain the model regularly.
 4. **Check how demographics are collected** before using them in any decision.
 
