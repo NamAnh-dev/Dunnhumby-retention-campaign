@@ -4,7 +4,7 @@
   2. For each model, fit every setting of a small grid on train, score it on validation (PR-AUC) and keep the best.
   3. Refit each model's best setting on train + validation (every week before the test) and evaluate it once on test.
   4. The final model (FINAL_MODEL in config.py, with its best validation setting) is refit on ALL labelled
-     snapshots (including the test week) and saved to models/churn_model.joblib: this is the model used to score new weeks.
+     snapshots (including the test week) and saved to models/churn_model.joblib: the model that scores new weeks.
 We split by time (not at random) because the same household appears in several snapshots,
 and in real use the model always predicts the future from the past.
 
@@ -66,9 +66,11 @@ class RecencyRule:
     """
 
     def fit(self, X, y):
+        """Nothing to learn: the rule is fixed."""
         return self
 
     def predict_proba(self, X):
+        """Same format as scikit-learn: column 1 is the risk score (a ranking score, not a calibrated probability)."""
         recency = X["recency_weeks"].to_numpy(dtype=float) / OBSERVATION_WEEKS           # 0 .. 11/12
         inactive = 1 - X["active_weeks_12w"].to_numpy(dtype=float) / OBSERVATION_WEEKS   # 0 .. 11/12
         risk = recency + 0.01 * inactive
@@ -102,6 +104,7 @@ def precision_at_top(y, score, fraction=TOP_FRACTION) -> float:
 
 
 def evaluate(y, score) -> dict:
+    """ROC-AUC, PR-AUC, and precision and lift in the top 10% for one set of scores."""
     base_rate = float(np.mean(y))
     p_top = precision_at_top(y, score)
     return {
@@ -115,7 +118,8 @@ def evaluate(y, score) -> dict:
 def validation_score(model, train: pd.DataFrame, valid: pd.DataFrame) -> float:
     """PR-AUC on the validation week of a model fitted on the training weeks."""
     model.fit(train[FEATURES], train["churn"])
-    return float(average_precision_score(valid["churn"], model.predict_proba(valid[FEATURES])[:, 1]))
+    prob = model.predict_proba(valid[FEATURES])[:, 1]
+    return float(average_precision_score(valid["churn"], prob))
 
 
 def tune(train: pd.DataFrame, valid: pd.DataFrame) -> pd.DataFrame:
@@ -135,6 +139,7 @@ def best_settings(results: pd.DataFrame) -> pd.DataFrame:
 
 
 def build_model(name: str, params: dict):
+    """A new, untrained model with the given setting (the recency rule has no settings)."""
     return RecencyRule() if name == "recency_rule" else make_model(name).set_params(**params)
 
 
@@ -206,6 +211,7 @@ def threshold_report(y, prob, thresholds: dict) -> pd.DataFrame:
 
 
 def main():
+    """Tune on validation, report on test, then save the final model, the results and the scores."""
     table = pd.read_csv(PROCESSED_DIR / "model_table.csv")
     train, valid, test = time_split(table)
     print(f"train {len(train):,} rows (cutoffs < {VALID_CUTOFF}) | valid {len(valid):,} rows (cutoff {VALID_CUTOFF}) "
@@ -220,7 +226,8 @@ def main():
     valid_scores = score_with_best(best, train, valid)
     # Test: refit each best setting on train + validation (every week before the test), score the test week once
     test_scores = score_with_best(best, pd.concat([train, valid]), test)
-    test_results = pd.DataFrame({name: evaluate(test["churn"], test_scores[f"score_{name}"]) for name in best.index}).T
+    per_model = {name: evaluate(test["churn"], test_scores[f"score_{name}"]) for name in best.index}
+    test_results = pd.DataFrame(per_model).T
     print("\nTest (reported once):")
     print(test_results.round(3))
 

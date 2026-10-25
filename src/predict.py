@@ -20,6 +20,7 @@ from src.features import FEATURES, build_scoring_table, load_inputs
 
 
 def main(argv=None):
+    """Score the households at risk at the cutoff week and write the top TOP_FRACTION by expected sales lost."""
     parser = argparse.ArgumentParser(description="Score at-risk households with the saved churn model.")
     parser.add_argument("--cutoff", type=int, help="week to score (default: the last week in the data)")
     args = parser.parse_args(argv)
@@ -38,7 +39,8 @@ def main(argv=None):
                "recency_weeks", "active_weeks_12w"]
     coupon_list = table.head(k)[columns].round(3)
     coupon_list.to_csv(REPORTS_DIR / "coupon_list.csv", index=False)
-    print(f"Week {cutoff}: {len(table):,} households at risk -> coupon list of the top {TOP_FRACTION:.0%} ({k} households)")
+    print(f"Week {cutoff}: {len(table):,} households at risk -> "
+          f"coupon list of the top {TOP_FRACTION:.0%} ({k} households)")
     print(f"mean churn probability in the list {coupon_list['churn_probability'].mean():.1%} "
           f"vs {table['churn_probability'].mean():.1%} for all at-risk households")
     print("Wrote reports/coupon_list.csv")
