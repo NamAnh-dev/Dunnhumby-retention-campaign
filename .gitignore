@@ -24,3 +24,6 @@ Thumbs.db
 
 # Trained models (re-create with python -m src.train)
 models/
+
+# Personal interview notes
+STUDY_NOTES.md
