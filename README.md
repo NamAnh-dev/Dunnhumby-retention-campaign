@@ -95,16 +95,18 @@ Contacting the top **10%** reaches **44%** of all churners; the top 20% reaches 
 
 **Explainability and experiments** ([notebook 03](notebooks/03_explain_and_business.ipynb), [notebook 04](notebooks/04_experiments.ipynb)):
 
-![SHAP beeswarm](reports/figures/shap_beeswarm.png)
+![Logistic regression coefficients](reports/figures/logistic_coefficients.png)
 
-- **SHAP:** risk goes up with long silences (`recency_weeks`) and down for households that buy often, regularly and from many departments. "Demographics missing" is also used by the model, but validating without demographics gives the same PR-AUC (0.348 → 0.349), so the model does not depend on that possible bias.
+- **Coefficients** (standardized, so they can be compared): households that buy **often and regularly** are safe. One standard deviation more purchase weeks in the last 12 (about 3.6 weeks) multiplies the odds of churn by 0.47. Correlated features (recency, purchase weeks, baskets) share the effect, so they are read as a group.
+- **SHAP** tells the same story per household: for a linear model it is coefficient × (value − average), checked in the notebook.
+- **Demographics** are not used: adding them does not improve validation PR-AUC (0.296 without, 0.293 with).
 
 | Question | What I tried | Result | Decision |
 |---|---|---|---|
 | Which model? | logistic, random forest, small grid each | tied, both beat the baseline | logistic regression: as good, easier to explain |
 | Class imbalance? | `class_weight="balanced"` | no ranking gain; mean predicted churn goes from 7% to 29% | train on the real data, use PR-AUC / top-k |
 | Which threshold? | 0.5, best F1, top 10% | 0.5 flags nobody | top-k for a fixed budget |
-| Need demographics? | validate with / without | 0.348 vs 0.349 | behaviour carries the signal |
+| Need demographics? | validate with / without | 0.296 vs 0.293 | behaviour carries the signal |
 
 ## 5. Recommendation: who gets a coupon?
 
