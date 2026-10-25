@@ -10,16 +10,16 @@
 |---|---|
 | **Problem** | Choose the 10% of at-risk households that get a retention coupon. |
 | **Data** | dunnhumby *The Complete Journey* (Kaggle): 2.6M transaction lines, 2,500 households, 102 weeks. |
-| **Approach** | 7 SQL queries (DuckDB) → 8-week churn labels at 9 snapshot weeks → recency rule vs logistic regression vs random forest, split by time → rank by churn risk × recent sales. |
-| **Result** | The top 10% holds 82 churners vs ~19 at random (4.3x lift). Ranking by risk × sales reaches 35% of the sales at risk (41% on the validation week) vs 15% (17%) by risk alone. |
-| **Recommendation** | Target by risk × sales, but A/B test first: ~788 households per group (~7 weekly lists). |
+| **Approach** | 7 SQL queries (DuckDB) -> 8-week churn labels at 9 snapshot weeks -> recency rule vs logistic regression vs random forest, split by time -> rank by churn risk x recent sales. |
+| **Result** | The top 10% holds 82 churners vs ~19 at random (4.3x lift). Ranking by risk x sales reaches 35% of the sales at risk (41% on the validation week) vs 15% (17%) by risk alone. |
+| **Recommendation** | Target by risk x sales, but A/B test first: ~788 households per group (~7 weekly lists). |
 
 Tools: SQL (DuckDB), pandas, scikit-learn, SHAP, pytest (28 tests on GitHub Actions).
 
 ## 1. Data and churn definition
 
 2,595,732 transaction lines, a product table (departments) and demographics for 801 of the 2,500 households (32%).
-**Churn at week *c*:** the household bought in weeks *c−11 … c* ("at risk") and buys **nothing** in weeks *c+1 … c+8*.
+**Churn at week *c*:** the household bought in weeks *c-11 ... c* ("at risk") and buys **nothing** in weeks *c+1 ... c+8*.
 Why 8 weeks: in 72% of the gaps between two purchase weeks the household comes back the very next week, and only 2% of the gaps last 8+ weeks. Churn here is a lapse, not a confirmed lost customer.
 
 ## 2. SQL and KPIs
@@ -28,11 +28,11 @@ All data preparation is SQL run by **DuckDB** on the raw CSVs; every query is te
 
 | Query | SQL | Output |
 |---|---|---|
-| [`01_weekly_activity`](sql/01_weekly_activity.sql) | `GROUP BY`, `COUNT(DISTINCT)`, `LEFT JOIN` | household × week activity |
+| [`01_weekly_activity`](sql/01_weekly_activity.sql) | `GROUP BY`, `COUNT(DISTINCT)`, `LEFT JOIN` | household x week activity |
 | [`02_rfm`](sql/02_rfm.sql) | CTEs, `CASE`, `NTILE(5)` | 5 segments from recency and frequency |
 | [`03_period_retention`](sql/03_period_retention.sql) | self `LEFT JOIN` | 4-week retention |
 | [`04_department_sales`](sql/04_department_sales.sql) | `JOIN`, `SUM() OVER ()` | sales share by department |
-| [`05_purchase_gaps`](sql/05_purchase_gaps.sql) | `LAG() OVER (PARTITION BY …)` | silent weeks between purchases |
+| [`05_purchase_gaps`](sql/05_purchase_gaps.sql) | `LAG() OVER (PARTITION BY ...)` | silent weeks between purchases |
 | [`06_household_demographics`](sql/06_household_demographics.sql) | `LEFT JOIN`, `CASE` | cleaned demographics |
 | [`07_weekly_kpis`](sql/07_weekly_kpis.sql) | CTE, conditional `COUNT` | store KPIs per week |
 
@@ -49,8 +49,8 @@ A household is **active** in a week when its net sales are > 0, so a week with o
 
 ![Snapshot timeline](reports/figures/snapshot_timeline.png)
 
-20,588 rows (household × snapshot week) with **12 behaviour features** that only use weeks ≤ cutoff (tested).
-**Split by time:** train = weeks 30–78, validation = 86, test = 94 (used once). A random split would leak, because the same household appears in several snapshots.
+20,588 rows (household x snapshot week) with **12 behaviour features** that only use weeks <= cutoff (tested).
+**Split by time:** train = weeks 30-78, validation = 86, test = 94 (used once). A random split would leak, because the same household appears in several snapshots.
 
 | Model | Validation PR-AUC [95% CI] | Test PR-AUC [95% CI] | Test ROC-AUC | Lift @10% |
 |---|:---:|:---:|:---:|:---:|
@@ -73,13 +73,13 @@ Budget 10%; *sales at risk* = what the churners spent in the last 12 weeks. Test
 | Rank by | Churners reached | Share of sales at risk | List that does not churn |
 |---|---:|---:|---:|
 | churn risk | 82 (71) | 15% (17%) | 65% (69%) |
-| **churn risk × sales** | 40 (31) | **35% (41%)** | 83% (87%) |
-| recency rule × sales *(no model)* | 24 (21) | 25% (41%) | 90% (91%) |
+| **churn risk x sales** | 40 (31) | **35% (41%)** | 83% (87%) |
+| recency rule x sales *(no model)* | 24 (21) | 25% (41%) | 90% (91%) |
 | sales only *(no model)* | 2 (0) | 13% (0%) | 99% (100%) |
 
-1. **Rank by expected sales lost** (risk × sales): fewer churners, but ~2.4x more of the sales at risk than by risk alone. It finds more churners than the simple rule × sales; its lead on sales holds on test but not on validation.
-2. **Check the break-even, then A/B test.** A coupon pays off if it costs less than *r* × 31 per household (*r* = share of churners it keeps). To measure *r*, give it to a random half of the list: seeing churn drop 5 points (17% → 12%) needs ~788 households per group, ~7 weekly lists.
-3. **Watch the churn rate** (6.8% in week 86 → 8.2% in week 94) and retrain regularly.
+1. **Rank by expected sales lost** (risk x sales): fewer churners, but ~2.4x more of the sales at risk than by risk alone. It finds more churners than the simple rule x sales; its lead on sales holds on test but not on validation.
+2. **Check the break-even, then A/B test.** A coupon pays off if it costs less than *r* x 31 per household (*r* = share of churners it keeps). To measure *r*, give it to a random half of the list: seeing churn drop 5 points (17% -> 12%) needs ~788 households per group, ~7 weekly lists.
+3. **Watch the churn rate** (6.8% in week 86 -> 8.2% in week 94) and retrain regularly.
 
 `python -m src.predict` writes the coupon list of the latest week (231 of 2,310 households) to [`reports/coupon_list.csv`](reports/coupon_list.csv).
 
@@ -102,13 +102,13 @@ python -m src.predict     # latest week          -> reports/coupon_list.csv
 jupyter nbconvert --to notebook --execute --inplace notebooks/*.ipynb
 ```
 
-Code: `sql/` queries · `src/` pipeline (`features`, `train`, `business`, `predict`) · `notebooks/` 01 EDA, 02 models, 03 business · `tests/` 28 tests.
+Code: `sql/` queries, `src/` pipeline (`features`, `train`, `business`, `predict`), `notebooks/` 01 EDA, 02 models, 03 business, `tests/` 28 tests.
 
 ## What I learned and limitations
 
 - **The churn definition and the time split mattered more than the algorithm:** two very different models ended 0.004 PR-AUC apart.
 - **One week is noisy:** the same simple rule reached 41% of the sales at risk on the validation week and 25% on the test week, and the forest's lead over logistic regression went from 0.026 to 0.004 PR-AUC. I now check intervals and two weeks before believing a gap.
-- **Probabilities need care when they meet money:** ranking needs only the order, risk × sales needs the values, so I checked calibration and skipped class weights.
+- **Probabilities need care when they meet money:** ranking needs only the order, risk x sales needs the values, so I checked calibration and skipped class weights.
 - **Limitations:** churn = 8 weeks without a purchase (in a panel it can also mean leaving the panel); sales at risk is not sales saved, and the break-even uses sales, not profit; the coupon effect is unknown until an A/B test.
 
-Data: dunnhumby – *The Complete Journey*, as distributed on Kaggle. Raw data is not included in this repo.
+Data: dunnhumby - *The Complete Journey*, as distributed on Kaggle. Raw data is not included in this repo.

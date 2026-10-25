@@ -1,6 +1,6 @@
 # Data
 
-Source: **dunnhumby – The Complete Journey** (retail transactions of ~2,500 households over about two years), as distributed on Kaggle.
+Source: **dunnhumby - The Complete Journey** (retail transactions of ~2,500 households over about two years), as distributed on Kaggle.
 Check the dataset page for the current license/terms before reuse. Raw data is **not** committed to this repo.
 
 ## How to get it
