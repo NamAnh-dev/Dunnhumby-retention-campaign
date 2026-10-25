@@ -13,8 +13,8 @@ Tools: SQL (DuckDB), pandas, scikit-learn, SHAP, pytest.
 |---|---|
 | **Business question** | A grocery retailer can send retention coupons to about 10% of its active households. Who should get them? |
 | **Analysis (SQL)** | 7 DuckDB queries (KPIs, RFM segments, retention, purchase gaps), each unit-tested. Champions are 24% of households but 47% of sales. |
-| **Model** | 8-week churn model with a time-based split. The top 10% riskiest households contain 84 churners vs ~19 at random (4.5x lift). |
-| **Recommendation** | Rank households by **churn risk × recent sales**: with the same budget it reaches **43%** of the sales at risk, vs 15% when ranking by risk only and 25% with a simple rule without the model. Test the real coupon effect with an A/B test first. |
+| **Model** | 8-week churn model with a time-based split. The top 10% riskiest households contain 82 churners vs ~19 at random (4.3x lift). |
+| **Recommendation** | Rank households by **churn risk × recent sales**: with the same budget it reaches **35%** of the sales at risk on the test week (41% on validation), vs 15% (17%) when ranking by risk only. Test the real coupon effect with an A/B test first. |
 | **Deliverables** | 4 notebooks, coupon list script, 23 unit tests |
 
 ## 1. Problem and data
@@ -91,7 +91,7 @@ LightGBM was tried too and tied with both models, so it was dropped: two models 
 
 Both models beat the recency rule, and they are tied with each other (their intervals overlap on validation and on test).
 So I keep **logistic regression**: its probabilities are as well calibrated as the forest's (this matters because the coupon list multiplies them by sales), and its coefficients explain the risk directly.
-Contacting the top **10%** reaches **44%** of all churners; the top 20% reaches 68%.
+Contacting the top **10%** reaches **43%** of all churners; the top 20% reaches 70%.
 
 **Explainability and experiments** ([notebook 03](notebooks/03_explain_and_business.ipynb), [notebook 04](notebooks/04_experiments.ipynb)):
 
@@ -110,16 +110,18 @@ Contacting the top **10%** reaches **44%** of all churners; the top 20% reaches 
 
 ## 5. Recommendation: who gets a coupon?
 
-On the test week, with a budget of 10% (231 households). *Sales at risk* = what the churners spent in the last 12 weeks.
+Budget: 10% of the at-risk households (231 on the test week). *Sales at risk* = what the churners spent in the last 12 weeks.
+One week has few churners, so the table shows the test week and, in brackets, the validation week.
 
-| Rank households by | Churners reached | Share of all churners | Share of the sales at risk |
-|---|---:|---:|---:|
-| churn risk (model) | 84 | **44%** | 15% |
-| **churn risk × sales in the last 12 weeks (model)** | 42 | 22% | **43%** |
-| recency rule × sales *(no model)* | 24 | 13% | 25% |
-| sales only *(no model)* | 2 | 1% | 13% |
+| Rank households by | Churners reached | Share of all churners | Share of the sales at risk | List that does not churn |
+|---|---:|---:|---:|---:|
+| churn risk (model) | 82 (71) | **43%** (46%) | 15% (17%) | 65% (69%) |
+| **churn risk × sales in the last 12 weeks (model)** | 40 (31) | 21% (20%) | **35%** (41%) | 83% (87%) |
+| recency rule × sales *(no model)* | 24 (21) | 13% (14%) | 25% (41%) | 90% (91%) |
+| sales only *(no model)* | 2 (0) | 1% (0%) | 13% (0%) | 99% (100%) |
 
-1. **Send coupons by expected sales lost** (churn risk × recent sales). It finds fewer churners, but the ones who matter most for revenue. Without the model (last two rows) the same budget reaches much less of the sales at risk.
+1. **Send coupons by expected sales lost** (churn risk × recent sales). It finds fewer churners, but the ones who matter most for revenue: about 2.4x more of the sales at risk than ranking by risk alone. Against a simple rule × sales, the model finds more churners on both weeks; on sales it is ahead on test and level on validation, so that gain is not proven yet.
+   Most of the list would not churn anyway (83%): for them the coupon is only a discount.
 2. **Run an A/B test before rollout:** give the coupon to a random half of the list and compare churn after 8 weeks. This data cannot tell how many churners a coupon really keeps.
 3. **Watch the churn rate:** it rose from 6.8% (week 86) to 8.2% (week 94). Track it every week and retrain the model regularly.
 4. **Check how demographics are collected** before using them in any decision.
