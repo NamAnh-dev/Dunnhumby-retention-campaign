@@ -135,6 +135,15 @@ def build_model(name: str, params: dict):
     return RecencyRule() if name == "recency_rule" else make_model(name).set_params(**params)
 
 
+def score_with_best(best: pd.DataFrame, fit_on: pd.DataFrame, score_on: pd.DataFrame) -> pd.DataFrame:
+    """Fit each model's best setting on `fit_on` and add its churn score for every row of `score_on`."""
+    out = score_on[["household_key", "churn"] + FEATURES].copy()
+    for name, row in best.iterrows():
+        model = build_model(name, row["params"]).fit(fit_on[FEATURES], fit_on["churn"])
+        out[f"score_{name}"] = model.predict_proba(score_on[FEATURES])[:, 1]
+    return out
+
+
 def main():
     table = pd.read_csv(PROCESSED_DIR / "model_table.csv")
     train, valid, test = time_split(table)
@@ -145,13 +154,11 @@ def main():
     print(f"\nBest setting per model (PR-AUC on validation week {VALID_CUTOFF}):")
     print(best.round(3))
 
+    # Validation scores of the best settings (the same fits as in tune), kept for the notebooks
+    valid_scores = score_with_best(best, train, valid)
     # Test: refit each best setting on train + validation (every week before the test), score the test week once
-    before_test = pd.concat([train, valid])
-    scores = {}
-    for name, row in best.iterrows():
-        model = build_model(name, row["params"]).fit(before_test[FEATURES], before_test["churn"])
-        scores[name] = model.predict_proba(test[FEATURES])[:, 1]
-    test_results = pd.DataFrame({name: evaluate(test["churn"], s) for name, s in scores.items()}).T
+    test_scores = score_with_best(best, pd.concat([train, valid]), test)
+    test_results = pd.DataFrame({name: evaluate(test["churn"], test_scores[f"score_{name}"]) for name in best.index}).T
     print("\nTest (reported once):")
     print(test_results.round(3))
 
@@ -165,9 +172,7 @@ def main():
     REPORTS_DIR.mkdir(exist_ok=True)
     best.to_csv(REPORTS_DIR / "validation_results.csv")
     test_results.to_csv(REPORTS_DIR / "test_results.csv")
-    test_scores = test[["household_key", "churn"] + FEATURES].copy()
-    for name, s in scores.items():
-        test_scores[f"score_{name}"] = s
+    valid_scores.to_csv(PROCESSED_DIR / "valid_scores.csv", index=False)
     test_scores.to_csv(PROCESSED_DIR / "test_scores.csv", index=False)
 
 
