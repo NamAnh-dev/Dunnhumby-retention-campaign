@@ -18,8 +18,13 @@ PREDICTION_WEEKS = 8     # churn = 1 if it does not buy in the next 8 weeks
 SNAPSHOT_STEP = 8        # one snapshot every 8 weeks, so label windows never overlap
 FIRST_CUTOFF = 30        # earlier weeks are still "warming up" (households are still appearing)
 
-# Time-based split over the snapshot cutoff weeks
-VALID_CUTOFFS = [70, 78, 86]   # choose the model here: for each week, train on the earlier snapshots and score this one
-TEST_CUTOFF = 94               # report the final result here, once
+# Time-based split over the snapshot cutoff weeks: train = 30 .. 78, validation = 86, test = 94
+VALID_CUTOFF = 86   # choose each model's settings here (the models only learn from the earlier snapshots)
+TEST_CUTOFF = 94    # report the final result here, once
+
+# Model used by src/predict.py. Logistic regression and random forest tie on validation and test (their bootstrap
+# intervals overlap) and their probabilities are equally well calibrated, so we keep the simpler one: its
+# coefficients explain the risk directly. See notebook 02.
+FINAL_MODEL = "logistic"
 
 TOP_FRACTION = 0.10      # assumed budget: we can send a coupon to 10% of at-risk households

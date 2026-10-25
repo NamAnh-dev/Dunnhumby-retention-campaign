@@ -25,6 +25,5 @@ Thumbs.db
 # Trained models (re-create with python -m src.train)
 models/
 
-# Power BI project: local settings and the data cache stay on this computer
-**/.pbi/localSettings.json
-**/.pbi/cache.abf
+# Personal interview notes
+STUDY_NOTES.md

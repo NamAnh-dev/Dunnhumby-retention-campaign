@@ -1,136 +1,87 @@
-# Grocery Customer Retention: SQL Analysis, Churn Model and Coupon Targeting
+# Grocery Customer Retention: SQL, Churn Model and Coupon Targeting
 
-**Which households are about to stop shopping, and which of them are worth a retention coupon?**
-
-Data: dunnhumby *The Complete Journey* (2.6M transactions, 2,500 households, 102 weeks).
-Tools: SQL (DuckDB), pandas, scikit-learn, LightGBM, SHAP, Power BI, pytest.
+**A grocery retailer can send a retention coupon to 10% of its active households. Who is about to stop shopping, and who is worth the coupon?**
 
 ![Churners and sales at risk reached by each ranking](reports/figures/targeting_curve.png)
 
-## Summary
+## TL;DR
 
 | | |
 |---|---|
-| **Business question** | A grocery retailer can send retention coupons to about 10% of its active households. Who should get them? |
-| **Analysis (SQL)** | 7 DuckDB queries (KPIs, RFM segments, retention, purchase gaps), each unit-tested. Champions are 24% of households but 47% of sales. |
-| **Model** | 8-week churn model with a time-based split. The top 10% riskiest households contain 84 churners vs ~19 at random (4.5x lift). |
-| **Recommendation** | Rank households by **churn risk × recent sales**: with the same budget it reaches **43%** of the sales at risk, vs 15% when ranking by risk only and 25% with a simple rule without the model. Test the real coupon effect with an A/B test first. |
-| **Deliverables** | 4 notebooks, Power BI report (3 pages), coupon list script, 24 unit tests |
+| **Problem** | Choose the 10% of at-risk households that get a retention coupon. |
+| **Data** | dunnhumby *The Complete Journey* (Kaggle): 2.6M transaction lines, 2,500 households, 102 weeks. |
+| **Approach** | 7 SQL queries (DuckDB) → 8-week churn labels at 9 snapshot weeks → recency rule vs logistic regression vs random forest, split by time → rank by churn risk × recent sales. |
+| **Result** | The top 10% holds 82 churners vs ~19 at random (4.3x lift). Ranking by risk × sales reaches 35% of the sales at risk (41% on the validation week) vs 15% (17%) by risk alone. |
+| **Recommendation** | Target by risk × sales, but A/B test first: ~788 households per group (~7 weekly lists). |
 
-## 1. Problem and data
+Tools: SQL (DuckDB), pandas, scikit-learn, SHAP, pytest (28 tests on GitHub Actions).
 
-The budget covers about **10%** of active households, so the retailer needs to know **who** is likely to stop shopping in the next 8 weeks, and **who is worth** a coupon.
+## 1. Data and churn definition
 
-| Table | Rows | Used for |
-|---|---:|---|
-| `transaction_data` | 2,595,732 | one row per product line in a basket: sales, discounts, coupons, week |
-| `product` | 92,353 | department of each product |
-| `hh_demographic` | 801 | age, income, household size, home ownership (only 32% of households) |
-
-**Churn at week *c*:** the household bought something in weeks *c-11 … c* (it is "at risk") and buys **nothing** in weeks *c+1 … c+8*.
-Why 8 weeks: in 72% of cases a household buys again the very next week, and only 2% of the gaps between two purchases last 8 weeks or more (notebook 01).
+2,595,732 transaction lines, a product table (departments) and demographics for 801 of the 2,500 households (32%).
+**Churn at week *c*:** the household bought in weeks *c−11 … c* ("at risk") and buys **nothing** in weeks *c+1 … c+8*.
+Why 8 weeks: in 72% of the gaps between two purchase weeks the household comes back the very next week, and only 2% of the gaps last 8+ weeks. Churn here is a lapse, not a confirmed lost customer.
 
 ## 2. SQL and KPIs
 
-All data preparation runs in SQL with **DuckDB**, directly on the raw CSVs. Every query is tested on tiny hand-made tables ([`tests/test_sql.py`](tests/test_sql.py)).
+All data preparation is SQL run by **DuckDB** on the raw CSVs; every query is tested on tiny hand-made tables.
 
-| Query | SQL technique | Output |
+| Query | SQL | Output |
 |---|---|---|
-| [`01_weekly_activity`](sql/01_weekly_activity.sql) | `GROUP BY`, `COUNT(DISTINCT)`, `LEFT JOIN`, `CASE` | household × week activity (123,976 rows) |
-| [`02_rfm`](sql/02_rfm.sql) | CTEs, window function `NTILE(5)` | RFM scores and 5 customer segments |
-| [`03_period_retention`](sql/03_period_retention.sql) | self `LEFT JOIN` | retention from one 4-week period to the next |
-| [`04_department_sales`](sql/04_department_sales.sql) | `JOIN`, window `SUM() OVER ()` | sales share by department |
-| [`05_purchase_gaps`](sql/05_purchase_gaps.sql) | `LAG() OVER (PARTITION BY ...)` | silent weeks between two purchases |
-| [`06_household_demographics`](sql/06_household_demographics.sql) | `LEFT JOIN`, `CASE` cleaning | text ranges → numbers (`"50-74K"` → 62), unknown → `NULL` |
-| [`07_weekly_kpis`](sql/07_weekly_kpis.sql) | CTE, conditional `COUNT` | store KPIs per week (for the dashboard) |
+| [`01_weekly_activity`](sql/01_weekly_activity.sql) | `GROUP BY`, `COUNT(DISTINCT)`, `LEFT JOIN` | household × week activity |
+| [`02_rfm`](sql/02_rfm.sql) | CTEs, `CASE`, `NTILE(5)` | 5 segments from recency and frequency |
+| [`03_period_retention`](sql/03_period_retention.sql) | self `LEFT JOIN` | 4-week retention |
+| [`04_department_sales`](sql/04_department_sales.sql) | `JOIN`, `SUM() OVER ()` | sales share by department |
+| [`05_purchase_gaps`](sql/05_purchase_gaps.sql) | `LAG() OVER (PARTITION BY …)` | silent weeks between purchases |
+| [`06_household_demographics`](sql/06_household_demographics.sql) | `LEFT JOIN`, `CASE` | cleaned demographics |
+| [`07_weekly_kpis`](sql/07_weekly_kpis.sql) | CTE, conditional `COUNT` | store KPIs per week |
 
-**KPI definitions** (the same in SQL, Python and Power BI):
+A household is **active** in a week when its net sales are > 0, so a week with only returns does not count.
 
-| KPI | Definition |
-|---|---|
-| Active household (in a week) | net sales in that week > 0, so a week with only returns does not count |
-| Basket value | net sales / number of baskets |
-| Discount share | discounts / (net sales + discounts) |
-| 4-week retention | share of the households active in period *p* that are active again in period *p+1* |
-| 8-week churn rate | share of at-risk households with no purchase in the next 8 weeks |
+## 3. Key findings ([notebook 01](notebooks/01_eda_sql.ipynb))
 
-**Data quality:** no missing values or duplicated rows in the transactions; 0.7% of lines are returns or free items (kept in net sales);
-discounts are stored as negative numbers (the SQL flips the sign); demographics are missing for 68% of households (handled in the model pipeline).
+1. **Stable business, rare churn:** ~1,300 active households and ~86k sales per week; ~90% of the households active in a 4-week period come back in the next one; ~7% of at-risk households churn in 8 weeks.
+2. **Concentrated sales:** champions (bought in the last 2 weeks, among the 40% most regular) are 36% of households but 66% of sales.
+3. **Churners are small spenders:** median 12-week sales of 65 vs 336 for the others.
+4. **Possible survey bias:** households with demographics almost never churn (1% vs 11%), so the model does not use them.
 
-## 3. Key findings
-
-![RFM segments](reports/figures/rfm_segments.png)
-
-1. **The business is stable and churn is rare.** After a warm-up of ~17 weeks: ~1,300 active households and ~86k net sales per week, and ~90% of the households active in a 4-week period come back in the next one.
-2. **Sales are concentrated.** Champions are 24% of households but 47% of sales; "lost" households are 26% of households and only 7% of sales.
-3. **Churners are small spenders.** Median sales in the last 12 weeks: 65 for churners vs 336 for the others. Targeting by risk alone spends coupons on small losses.
-4. **Possible survey bias.** Households with demographics almost never churn (1% vs 11%). One possible reason (not verified): only loyal households answered the survey.
-
-## 4. Power BI dashboard
-
-![Power BI report: business overview page](reports/figures/powerbi_overview.png)
-
-Three pages: **business overview** (KPI cards, week slicer, trends), **customer segments** (share of households vs share of sales), **churn & coupons** (churn rate per snapshot, coupon list).
-The data model has a week dimension (`dim_week`) and DAX measures (`DIVIDE`, `CALCULATE` + `ALL`, `VAR`, `RANKX`).
-Open [`powerbi/RetentionDashboard.pbip`](powerbi) in Power BI Desktop (see [`powerbi/README.md`](powerbi/README.md)) or read the [PDF export](reports/RetentionDashboard.pdf).
-The report only needs the small CSV files in [`reports/dashboard/`](reports/dashboard), not the raw data.
-
-## 5. Churn model
+## 4. Churn model ([notebook 02](notebooks/02_modeling.ipynb))
 
 ![Snapshot timeline](reports/figures/snapshot_timeline.png)
 
-- **9 snapshots** (cutoff weeks 30, 38, …, 94) → **20,588** rows (household × cutoff week), churn rate **~7%**.
-- **Features** ([`src/features.py`](src/features.py)): 12 behaviour features (recency, how regularly the household buys, recent sales and baskets, discounts, coupons, departments) + 5 demographics. They only use weeks ≤ cutoff (tested in [`tests/test_features.py`](tests/test_features.py)).
-- **Preprocessing** (`log1p`, median imputation, one-hot) sits inside a scikit-learn `Pipeline`, so it is fitted on training data only.
-- **Split by time, not at random**, because the same household appears in several snapshots and in real use we predict the future from the past:
-  - **validation** on weeks 70, 78 and 86: for each week, train on the earlier snapshots only and score that week; a setting's score is the average PR-AUC of the 3 weeks (one week alone is noisy);
-  - **test** on week 94, used once at the end;
-  - the chosen model is then **refit on all snapshots** and saved, so the coupon list uses the most recent data.
+20,588 rows (household × snapshot week) with **12 behaviour features** that only use weeks ≤ cutoff (tested).
+**Split by time:** train = weeks 30–78, validation = 86, test = 94 (used once). A random split would leak, because the same household appears in several snapshots.
 
-**Results on the test week** (2,316 households, churn rate 8.2%), with 95% bootstrap intervals:
-
-| Model | ROC-AUC | PR-AUC [95% CI] | Precision @10% | Lift @10% |
+| Model | Validation PR-AUC [95% CI] | Test PR-AUC [95% CI] | Test ROC-AUC | Lift @10% |
 |---|:---:|:---:|:---:|:---:|
-| Recency rule *(baseline, no ML)* | 0.763 | 0.234 [0.19, 0.28] | 0.316 | 3.9x |
-| Logistic regression | 0.857 | 0.322 [0.27, 0.39] | 0.372 | 4.6x |
-| **Random forest** *(chosen on validation)* | 0.856 | 0.329 [0.27, 0.40] | 0.364 | 4.5x |
-| LightGBM | 0.857 | 0.333 [0.28, 0.40] | 0.372 | 4.6x |
+| Recency rule *(no ML)* | 0.256 [0.21, 0.32] | 0.265 [0.21, 0.32] | 0.816 | 3.9x |
+| **Logistic regression** *(final)* | 0.296 [0.24, 0.37] | 0.326 [0.27, 0.39] | 0.857 | 4.3x |
+| Random forest | 0.322 [0.26, 0.40] | 0.330 [0.27, 0.40] | 0.855 | 4.4x |
 
-> **Why not accuracy?** With 8% churners, predicting "no churn" for everyone already scores 92% accuracy. PR-AUC and precision in the top 10% (the coupon budget) show what matters.
+PR-AUC, not accuracy: with 8% churners, "nobody churns" is 92% accurate. Intervals: 1,000 bootstrap resamples.
+**Why logistic regression:** tied with the forest (overlapping intervals), equally well calibrated (Brier 0.0628 vs 0.0625), which matters because the list multiplies the probability by sales, and its coefficients explain the risk.
+Class weights and demographics did not help (class weights pushed the mean predicted churn from 7% to 29%).
 
-All ML models beat the recency rule, and they are tied with each other (their intervals overlap), so I do not claim one is "the best".
-Contacting the top **10%** reaches **44%** of all churners; the top 20% reaches 68%.
+![Logistic regression coefficients](reports/figures/logistic_coefficients.png)
 
-**Explainability and experiments** ([notebook 03](notebooks/03_explain_and_business.ipynb), [notebook 04](notebooks/04_experiments.ipynb)):
+Households that buy **often and regularly** are safe: 1 standard deviation more purchase weeks in the last 12 (~3.6 weeks) multiplies the odds of churn by 0.47.
 
-![SHAP beeswarm](reports/figures/shap_beeswarm.png)
+## 5. Recommendation ([notebook 03](notebooks/03_explain_and_business.ipynb))
 
-- **SHAP:** risk goes up with long silences (`recency_weeks`) and down for households that buy often, regularly and from many departments. "Demographics missing" is also used by the model, but validating without demographics gives the same PR-AUC (0.348 → 0.349), so the model does not depend on that possible bias.
+Budget 10%; *sales at risk* = what the churners spent in the last 12 weeks. Test week (validation week):
 
-| Question | What I tried | Result | Decision |
-|---|---|---|---|
-| Which model? | logistic, random forest, LightGBM, small grid each | close to each other, all beat the baseline | keep the one chosen on validation |
-| Class imbalance? | `class_weight="balanced"` | no ranking gain; mean predicted churn goes from 7% to 29% | train on the real data, use PR-AUC / top-k |
-| Which threshold? | 0.5, best F1, top 10% | 0.5 flags nobody | top-k for a fixed budget |
-| Need demographics? | validate with / without | 0.348 vs 0.349 | behaviour carries the signal |
-
-## 6. Recommendation: who gets a coupon?
-
-On the test week, with a budget of 10% (231 households). *Sales at risk* = what the churners spent in the last 12 weeks.
-
-| Rank households by | Churners reached | Share of all churners | Share of the sales at risk |
+| Rank by | Churners reached | Share of sales at risk | List that does not churn |
 |---|---:|---:|---:|
-| churn risk (model) | 84 | **44%** | 15% |
-| **churn risk × sales in the last 12 weeks (model)** | 42 | 22% | **43%** |
-| recency rule × sales *(no model)* | 24 | 13% | 25% |
-| sales only *(no model)* | 2 | 1% | 13% |
+| churn risk | 82 (71) | 15% (17%) | 65% (69%) |
+| **churn risk × sales** | 40 (31) | **35% (41%)** | 83% (87%) |
+| recency rule × sales *(no model)* | 24 (21) | 25% (41%) | 90% (91%) |
+| sales only *(no model)* | 2 (0) | 13% (0%) | 99% (100%) |
 
-1. **Send coupons by expected sales lost** (churn risk × recent sales). It finds fewer churners, but the ones who matter most for revenue. Without the model (last two rows) the same budget reaches much less of the sales at risk.
-2. **Run an A/B test before rollout:** give the coupon to a random half of the list and compare churn after 8 weeks. This data cannot tell how many churners a coupon really keeps.
-3. **Watch the churn rate:** it rose from 6.8% (week 86) to 8.2% (week 94). Track it in the Power BI report and retrain the model regularly.
-4. **Check how demographics are collected** before using them in any decision.
+1. **Rank by expected sales lost** (risk × sales): fewer churners, but ~2.4x more of the sales at risk than by risk alone. It finds more churners than the simple rule × sales; its lead on sales holds on test but not on validation.
+2. **Check the break-even, then A/B test.** A coupon pays off if it costs less than *r* × 31 per household (*r* = share of churners it keeps). To measure *r*, give it to a random half of the list: seeing churn drop 5 points (17% → 12%) needs ~788 households per group, ~7 weekly lists.
+3. **Watch the churn rate** (6.8% in week 86 → 8.2% in week 94) and retrain regularly.
 
-`python -m src.predict` scores the 2,310 households at risk in the latest week and writes the top 10% to [`reports/coupon_list.csv`](reports/coupon_list.csv).
+`python -m src.predict` writes the coupon list of the latest week (231 of 2,310 households) to [`reports/coupon_list.csv`](reports/coupon_list.csv).
 
 ## How to run
 
@@ -138,45 +89,26 @@ On the test week, with a budget of 10% (231 households). *Sales at risk* = what 
 python -m venv .venv
 .venv\Scripts\activate             # macOS/Linux: source .venv/bin/activate
 pip install -r requirements.txt
-pytest -q                          # 24 unit tests, no raw data needed
+pytest -q                          # 28 unit tests, no raw data needed
 ```
 
-To rebuild everything, download the dataset from Kaggle (see [`data/README.md`](data/README.md)), put the CSVs in `data/raw/`, then:
+With the Kaggle CSVs in `data/raw/` (see [`data/README.md`](data/README.md)):
 
 ```bash
-python -m src.data             # run the 7 SQL files             -> data/processed/
-python -m src.features         # churn labels + features         -> data/processed/model_table.csv
-python -m src.train            # validate, test, save the model  -> models/churn_model.joblib
-python -m src.predict          # score the latest week           -> reports/coupon_list.csv
-python -m src.dashboard_data   # summary tables for Power BI     -> reports/dashboard/
+python -m src.data        # 7 SQL files          -> data/processed/
+python -m src.features    # labels + features    -> data/processed/model_table.csv
+python -m src.train       # validate, test, save -> models/churn_model.joblib
+python -m src.predict     # latest week          -> reports/coupon_list.csv
+jupyter nbconvert --to notebook --execute --inplace notebooks/*.ipynb
 ```
 
-Notebooks, in order: [`01`](notebooks/01_eda_sql.ipynb) SQL & EDA → [`02`](notebooks/02_modeling.ipynb) features & models → [`03`](notebooks/03_explain_and_business.ipynb) SHAP & targeting → [`04`](notebooks/04_experiments.ipynb) experiments.
+Code: `sql/` queries · `src/` pipeline (`features`, `train`, `business`, `predict`) · `notebooks/` 01 EDA, 02 models, 03 business · `tests/` 28 tests.
 
-```
-dunnhumby-retention/
-├── sql/                   7 SQL files, run with DuckDB on the raw CSVs
-├── src/
-│   ├── config.py          all settings: churn windows, validation/test weeks, coupon budget
-│   ├── data.py            load CSVs, data-quality report, run the SQL files
-│   ├── features.py        churn labels + features at a cutoff week
-│   ├── train.py           preprocessing, validation, test, saves the final model
-│   ├── experiments.py     class weights, bootstrap, threshold helpers (notebook 04)
-│   ├── business.py        churners and sales at risk reached by a ranking
-│   ├── predict.py         scores the latest week -> coupon list
-│   └── dashboard_data.py  small summary tables for Power BI
-├── powerbi/               Power BI project: data model (DAX measures) + 3 report pages
-├── notebooks/             01 SQL & EDA · 02 modelling · 03 SHAP & business · 04 experiments
-├── tests/                 24 unit tests (SQL, labels, no future data, pipeline, metrics)
-└── reports/               figures, results, coupon list, Power BI tables and PDF export
-```
+## What I learned and limitations
 
-## Lessons and limitations
+- **The churn definition and the time split mattered more than the algorithm:** two very different models ended 0.004 PR-AUC apart.
+- **One week is noisy:** the same simple rule reached 41% of the sales at risk on the validation week and 25% on the test week, and the forest's lead over logistic regression went from 0.026 to 0.004 PR-AUC. I now check intervals and two weeks before believing a gap.
+- **Probabilities need care when they meet money:** ranking needs only the order, risk × sales needs the values, so I checked calibration and skipped class weights.
+- **Limitations:** churn = 8 weeks without a purchase (in a panel it can also mean leaving the panel); sales at risk is not sales saved, and the break-even uses sales, not profit; the coupon effect is unknown until an A/B test.
 
-- **The churn definition and leakage-free features mattered more than the algorithm**: three different models land within 0.01 PR-AUC.
-- **Who to target matters as much as how good the model is**: thinking in sales lost changed the coupon list.
-- "Churn" = 8 weeks without a purchase, not a confirmed lost customer; in a panel dataset it can also mean a household left the panel.
-- "Sales at risk" is not "sales saved": the coupon effect is unknown until an A/B test.
-- Next steps: an **A/B test** for the coupon effect, and later **uplift modelling** (who actually responds to a coupon).
-
-Data: dunnhumby – *The Complete Journey*, as distributed on Kaggle (see [`data/README.md`](data/README.md)). Raw data is not included in this repo.
+Data: dunnhumby – *The Complete Journey*, as distributed on Kaggle. Raw data is not included in this repo.

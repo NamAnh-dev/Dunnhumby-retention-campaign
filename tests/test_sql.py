@@ -37,12 +37,24 @@ def test_weekly_activity_aggregates_lines_into_baskets():
     assert hh1["n_coupon_items"] == 1
 
 
-def test_rfm_ties_are_broken_by_household_key():
-    # 5 households with exactly the same behaviour: without a tie-breaker NTILE could give different groups on every run
-    tx = pd.DataFrame({"household_key": [1, 2, 3, 4, 5], "week_no": [10] * 5, "sales_value": [1.0] * 5})
-    out = run_sql(SQL_DIR / "02_rfm.sql", connect_with(transaction_data=tx))
-    assert out["r_score"].tolist() == [1, 2, 3, 4, 5]
-    assert out["f_score"].tolist() == [1, 2, 3, 4, 5]
+def test_rfm_recency_score_uses_fixed_weeks():
+    # the data ends in week 20; households 1-6 last bought 0, 1, 2, 3, 5 and 9 weeks before; household 7 = same as household 1
+    tx = pd.DataFrame({"household_key": [1, 2, 3, 4, 5, 6, 7],
+                       "week_no":       [20, 19, 18, 17, 15, 11, 20],
+                       "sales_value":   [1.0] * 7})
+    out = run_sql(SQL_DIR / "02_rfm.sql", connect_with(transaction_data=tx)).set_index("household_key")
+    assert out["r_score"].tolist() == [5, 4, 3, 3, 2, 1, 5]      # same recency -> same score, whatever the household_key
+    assert "m_score" not in out.columns                         # segments use R and F only
+
+
+def test_rfm_frequency_score_and_segments():
+    # 10 households that all bought in the last week, with 1..10 purchase weeks
+    rows = [(hh, week) for hh in range(1, 11) for week in range(21 - hh, 21)]
+    tx = pd.DataFrame(rows, columns=["household_key", "week_no"]).assign(sales_value=1.0)
+    out = run_sql(SQL_DIR / "02_rfm.sql", connect_with(transaction_data=tx)).set_index("household_key")
+    assert out["f_score"].tolist() == [1, 1, 2, 2, 3, 3, 4, 4, 5, 5]
+    assert out.loc[10, "segment"] == "champions"                 # bought last week (R = 5) and most often (F = 5)
+    assert out.loc[1, "segment"] == "new_or_light"               # bought last week, but only once
 
 
 def test_weekly_kpis():

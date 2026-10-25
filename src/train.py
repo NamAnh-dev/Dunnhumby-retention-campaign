@@ -1,12 +1,10 @@
 """Train and compare churn models with a time-based split, then save the final model.
 
-  1. Split by time: dev = snapshots before the test week, test = the TEST_CUTOFF snapshot.
-  2. Validation: for each validation week (70, 78, 86) train on the earlier snapshots only and score that week.
-     A setting's validation score = its average PR-AUC over the 3 weeks (one week alone is noisy).
-  3. For each model, keep the setting with the best validation score.
-  4. Train each model on all dev snapshots and evaluate it once on the test snapshot.
-  5. The model with the best validation score is refit on ALL labelled snapshots (including the test week)
-     and saved to models/churn_model.joblib: this is the model used to score new weeks.
+  1. Split by time: train = snapshots 30 .. 78, validation = week 86 (VALID_CUTOFF), test = week 94 (TEST_CUTOFF).
+  2. For each model, fit every setting of a small grid on train, score it on validation (PR-AUC) and keep the best.
+  3. Refit each model's best setting on train + validation (every week before the test) and evaluate it once on test.
+  4. The final model (FINAL_MODEL in config.py, with its best validation setting) is refit on ALL labelled
+     snapshots (including the test week) and saved to models/churn_model.joblib: the model that scores new weeks.
 We split by time (not at random) because the same household appears in several snapshots,
 and in real use the model always predicts the future from the past.
 
@@ -17,66 +15,76 @@ Usage (from the repo root, after python -m src.features):
 import joblib
 import numpy as np
 import pandas as pd
-from lightgbm import LGBMClassifier
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import average_precision_score, roc_auc_score
+from sklearn.metrics import average_precision_score, precision_recall_curve, roc_auc_score
 from sklearn.model_selection import ParameterGrid
 from sklearn.pipeline import Pipeline, make_pipeline
-from sklearn.preprocessing import FunctionTransformer, OneHotEncoder, StandardScaler
+from sklearn.preprocessing import FunctionTransformer, StandardScaler
 
-from src.config import (MODEL_PATH, OBSERVATION_WEEKS, PREDICTION_WEEKS, PROCESSED_DIR,
-                        REPORTS_DIR, SEED, TEST_CUTOFF, TOP_FRACTION, VALID_CUTOFFS)
-from src.features import CATEGORICAL_DEMOGRAPHICS, FEATURES, NUMERIC_FEATURES
+from src.config import (FINAL_MODEL, MODEL_PATH, OBSERVATION_WEEKS, PREDICTION_WEEKS, PROCESSED_DIR,
+                        REPORTS_DIR, SEED, TEST_CUTOFF, TOP_FRACTION, VALID_CUTOFF)
+from src.features import FEATURES
 
 # Long right tail (a few households spend a lot): log1p makes them easier for the linear model
 SKEWED = ["baskets_12w", "sales_12w", "avg_basket_value_12w", "coupon_items_12w"]
-OTHER_NUMERIC = [c for c in NUMERIC_FEATURES if c not in SKEWED]
+OTHER = [c for c in FEATURES if c not in SKEWED]
 
 
 def time_split(table: pd.DataFrame):
-    """dev = every snapshot before the test week (training + validation), test = the test week."""
-    # The label of the last dev snapshot looks 8 weeks ahead; it must end before the test week starts
-    assert max(VALID_CUTOFFS) + PREDICTION_WEEKS <= TEST_CUTOFF
-    dev = table[table["cutoff_week"] < TEST_CUTOFF]
+    """train = snapshots before the validation week, valid = the validation week, test = the test week."""
+    train = table[table["cutoff_week"] < VALID_CUTOFF]
+    valid = table[table["cutoff_week"] == VALID_CUTOFF]
     test = table[table["cutoff_week"] == TEST_CUTOFF]
-    return dev, test
+    # A label looks PREDICTION_WEEKS ahead: it must end before the next part's cutoff,
+    # otherwise the model would learn from weeks it is later asked to predict
+    assert train["cutoff_week"].max() + PREDICTION_WEEKS <= VALID_CUTOFF
+    assert VALID_CUTOFF + PREDICTION_WEEKS <= TEST_CUTOFF
+    return train, valid, test
 
 
 def make_preprocessor() -> ColumnTransformer:
-    """Same preprocessing for every model, fitted on the training data only (inside the pipeline)."""
+    """Same preprocessing for every model, fitted on the training data only (inside the pipeline).
+
+    Standardizing puts every feature on the same scale, so the logistic coefficients can be compared.
+    The behaviour features have no missing values (no purchase in a window = 0), so nothing needs to be filled.
+    """
     return ColumnTransformer([
         ("skewed", make_pipeline(FunctionTransformer(np.log1p, feature_names_out="one-to-one"),
                                  StandardScaler()), SKEWED),
-        # income_k / household_size are missing for ~2/3 of households: fill with the median,
-        # the has_demographics column tells the model which values were filled
-        ("numeric", make_pipeline(SimpleImputer(strategy="median"), StandardScaler()), OTHER_NUMERIC),
-        ("categorical", make_pipeline(SimpleImputer(strategy="constant", fill_value="unknown"),
-                                      OneHotEncoder(handle_unknown="ignore", sparse_output=False)),
-         CATEGORICAL_DEMOGRAPHICS),
+        ("other", StandardScaler(), OTHER),
     ], verbose_feature_names_out=False)
 
 
 class RecencyRule:
-    """Baseline without machine learning: the longer since the last purchase, the higher the risk."""
+    """Baseline without machine learning: the longer since the last purchase, the higher the risk.
+
+    recency_weeks has only 12 values (0..11), so many households tie, and the top 10% would then depend on the
+    row order of the table. Ties are broken by active_weeks_12w: fewer purchase weeks = riskier. Its weight (0.01)
+    is smaller than one week of recency (1/12), so it never changes the recency order.
+    """
 
     def fit(self, X, y):
+        """Nothing to learn: the rule is fixed."""
         return self
 
     def predict_proba(self, X):
-        risk = X["recency_weeks"].to_numpy(dtype=float) / OBSERVATION_WEEKS   # at-risk households have recency 0..11
+        """Same format as scikit-learn: column 1 is the risk score (a ranking score, not a calibrated probability)."""
+        recency = X["recency_weeks"].to_numpy(dtype=float) / OBSERVATION_WEEKS           # 0 .. 11/12
+        inactive = 1 - X["active_weeks_12w"].to_numpy(dtype=float) / OBSERVATION_WEEKS   # 0 .. 11/12
+        risk = recency + 0.01 * inactive
         return np.column_stack([1 - risk, risk])
 
 
 def make_model(name: str) -> Pipeline:
-    """A new, untrained pipeline (preprocessing + classifier)."""
+    """A new, untrained pipeline (preprocessing + classifier).
+
+    Two models are enough to compare a linear model with a tree model. LightGBM was tried before and tied with both.
+    """
     classifiers = {
         "logistic": LogisticRegression(max_iter=2000),
         "random_forest": RandomForestClassifier(n_estimators=200, random_state=SEED, n_jobs=-1),
-        "lightgbm": LGBMClassifier(n_estimators=300, min_child_samples=50, subsample=0.8, subsample_freq=1,
-                                   colsample_bytree=0.8, random_state=SEED, verbose=-1),
     }
     return Pipeline([("prep", make_preprocessor()), ("clf", classifiers[name])])
 
@@ -85,18 +93,18 @@ def make_model(name: str) -> Pipeline:
 GRIDS = {
     "logistic": {"clf__C": [0.01, 0.1, 1, 10]},
     "random_forest": {"clf__max_depth": [4, 8, 12], "clf__min_samples_leaf": [20, 50, 100]},
-    "lightgbm": {"clf__num_leaves": [7, 15, 31], "clf__learning_rate": [0.02, 0.05]},
 }
 
 
 def precision_at_top(y, score, fraction=TOP_FRACTION) -> float:
     """Share of real churners among the `fraction` of households with the highest score."""
     k = max(1, int(len(y) * fraction))
-    top = np.argsort(-np.asarray(score))[:k]
+    top = np.argsort(-np.asarray(score), kind="stable")[:k]     # stable: ties keep the table order on every machine
     return float(np.asarray(y)[top].mean())
 
 
 def evaluate(y, score) -> dict:
+    """ROC-AUC, PR-AUC, and precision and lift in the top 10% for one set of scores."""
     base_rate = float(np.mean(y))
     p_top = precision_at_top(y, score)
     return {
@@ -107,66 +115,133 @@ def evaluate(y, score) -> dict:
     }
 
 
-def validation_score(model, dev: pd.DataFrame) -> float:
-    """Average PR-AUC over the validation weeks. For each week, the model only learns from earlier snapshots."""
-    scores = []
-    for week in VALID_CUTOFFS:
-        train = dev[dev["cutoff_week"] < week]
-        valid = dev[dev["cutoff_week"] == week]
-        model.fit(train[FEATURES], train["churn"])
-        prob = model.predict_proba(valid[FEATURES])[:, 1]
-        scores.append(average_precision_score(valid["churn"], prob))
-    return float(np.mean(scores))
+def validation_score(model, train: pd.DataFrame, valid: pd.DataFrame) -> float:
+    """PR-AUC on the validation week of a model fitted on the training weeks."""
+    model.fit(train[FEATURES], train["churn"])
+    prob = model.predict_proba(valid[FEATURES])[:, 1]
+    return float(average_precision_score(valid["churn"], prob))
 
 
-def tune(dev: pd.DataFrame) -> pd.DataFrame:
-    """Score every setting of every model on validation. Returns one row per model with its best setting."""
-    rows = [{"model": "recency_rule", "params": {}, "valid_pr_auc": validation_score(RecencyRule(), dev)}]
+def tune(train: pd.DataFrame, valid: pd.DataFrame) -> pd.DataFrame:
+    """Score every setting of every model on validation. One row per setting (the recency rule has no settings)."""
+    rows = [{"model": "recency_rule", "params": {}, "valid_pr_auc": validation_score(RecencyRule(), train, valid)}]
     for name, grid in GRIDS.items():
         for params in ParameterGrid(grid):
             model = make_model(name).set_params(**params)
-            rows.append({"model": name, "params": params, "valid_pr_auc": validation_score(model, dev)})
-            print(f"{name:14s} {str(params):55s} valid PR-AUC {rows[-1]['valid_pr_auc']:.3f}")
-    results = pd.DataFrame(rows)
+            rows.append({"model": name, "params": params, "valid_pr_auc": validation_score(model, train, valid)})
+    return pd.DataFrame(rows)
+
+
+def best_settings(results: pd.DataFrame) -> pd.DataFrame:
+    """The setting with the highest validation PR-AUC for each model, one row per model."""
     best_rows = results.groupby("model", sort=False)["valid_pr_auc"].idxmax()
     return results.loc[best_rows].set_index("model")
 
 
 def build_model(name: str, params: dict):
+    """A new, untrained model with the given setting (the recency rule has no settings)."""
     return RecencyRule() if name == "recency_rule" else make_model(name).set_params(**params)
 
 
-def main():
-    table = pd.read_csv(PROCESSED_DIR / "model_table.csv")
-    dev, test = time_split(table)
-    print(f"dev {len(dev):,} rows (cutoffs < {TEST_CUTOFF}) | test {len(test):,} rows (cutoff {TEST_CUTOFF})\n")
-
-    best = tune(dev)
-    print("\nBest setting per model (average PR-AUC over validation weeks", VALID_CUTOFFS, "):")
-    print(best.round(3))
-
-    # Test: train each model on all dev snapshots, score the test week once
-    scores = {}
+def score_with_best(best: pd.DataFrame, fit_on: pd.DataFrame, score_on: pd.DataFrame) -> pd.DataFrame:
+    """Fit each model's best setting on `fit_on` and add its churn score for every row of `score_on`."""
+    out = score_on[["household_key", "churn"] + FEATURES].copy()
     for name, row in best.iterrows():
-        model = build_model(name, row["params"]).fit(dev[FEATURES], dev["churn"])
-        scores[name] = model.predict_proba(test[FEATURES])[:, 1]
-    test_results = pd.DataFrame({name: evaluate(test["churn"], s) for name, s in scores.items()}).T
+        model = build_model(name, row["params"]).fit(fit_on[FEATURES], fit_on["churn"])
+        out[f"score_{name}"] = model.predict_proba(score_on[FEATURES])[:, 1]
+    return out
+
+
+# Extra checks used in notebook 02: is a difference real (bootstrap), class weights, and the decision threshold
+
+def bootstrap_ci(y, score, metric=average_precision_score, n_boot=1000, seed=SEED, alpha=0.05):
+    """95% interval of a metric: resample the households with replacement, recompute the metric, take percentiles."""
+    y, score = np.asarray(y), np.asarray(score)
+    rng = np.random.default_rng(seed)
+    values = []
+    for _ in range(n_boot):
+        idx = rng.integers(0, len(y), len(y))
+        if y[idx].sum() == 0:            # a sample without churners has no PR-AUC
+            continue
+        values.append(metric(y[idx], score[idx]))
+    return tuple(np.quantile(values, [alpha / 2, 1 - alpha / 2]))
+
+
+def compare_class_weight(best: pd.DataFrame, train: pd.DataFrame, valid: pd.DataFrame) -> pd.DataFrame:
+    """Fit each ML model twice (normal / class_weight="balanced") on train and score it on valid.
+
+    Two questions: does the ranking get better (PR-AUC, precision in the top 10%)?
+    And do the probabilities still match the real churn rate (mean predicted probability)?
+    """
+    rows = []
+    for name in GRIDS:
+        for class_weight in [None, "balanced"]:
+            model = build_model(name, best.loc[name, "params"]).set_params(clf__class_weight=class_weight)
+            prob = model.fit(train[FEATURES], train["churn"]).predict_proba(valid[FEATURES])[:, 1]
+            rows.append({
+                "model": name,
+                "class_weight": class_weight or "none",
+                "pr_auc": average_precision_score(valid["churn"], prob),
+                "precision_top10": precision_at_top(valid["churn"], prob),
+                "mean_predicted": prob.mean(),        # compare with the real churn rate
+            })
+    return pd.DataFrame(rows).set_index(["model", "class_weight"])
+
+
+def best_f1_threshold(y, prob) -> float:
+    """Probability threshold with the highest F1 score (balance of precision and recall)."""
+    precision, recall, thresholds = precision_recall_curve(y, prob)
+    f1 = 2 * precision * recall / np.clip(precision + recall, 1e-12, None)
+    return float(thresholds[np.argmax(f1[:-1])])      # the last precision/recall pair has no threshold
+
+
+def threshold_report(y, prob, thresholds: dict) -> pd.DataFrame:
+    """For each named threshold: how many households are flagged, and precision / recall / F1 among them."""
+    y, prob = np.asarray(y), np.asarray(prob)
+    rows = []
+    for name, t in thresholds.items():
+        flagged = prob >= t
+        tp = (flagged & (y == 1)).sum()
+        precision = tp / max(flagged.sum(), 1)
+        recall = tp / y.sum()
+        rows.append({"rule": name, "threshold": t, "households_flagged": int(flagged.sum()),
+                     "share_flagged": flagged.mean(), "precision": precision, "recall": recall,
+                     "f1": 2 * precision * recall / max(precision + recall, 1e-12)})
+    return pd.DataFrame(rows).set_index("rule")
+
+
+def main():
+    """Tune on validation, report on test, then save the final model, the results and the scores."""
+    table = pd.read_csv(PROCESSED_DIR / "model_table.csv")
+    train, valid, test = time_split(table)
+    print(f"train {len(train):,} rows (cutoffs < {VALID_CUTOFF}) | valid {len(valid):,} rows (cutoff {VALID_CUTOFF}) "
+          f"| test {len(test):,} rows (cutoff {TEST_CUTOFF})\n")
+
+    results = tune(train, valid)
+    print(f"PR-AUC on validation week {VALID_CUTOFF}, every setting:")
+    print(results.round(3).to_string(index=False))
+    best = best_settings(results)
+
+    # Validation scores of the best settings (the same fits as in tune), kept for the notebooks
+    valid_scores = score_with_best(best, train, valid)
+    # Test: refit each best setting on train + validation (every week before the test), score the test week once
+    test_scores = score_with_best(best, pd.concat([train, valid]), test)
+    per_model = {name: evaluate(test["churn"], test_scores[f"score_{name}"]) for name in best.index}
+    test_results = pd.DataFrame(per_model).T
     print("\nTest (reported once):")
     print(test_results.round(3))
 
-    # Final model: chosen on validation (not on test), then refit on every labelled snapshot
-    chosen = best.drop("recency_rule")["valid_pr_auc"].idxmax()
-    final = build_model(chosen, best.loc[chosen, "params"]).fit(table[FEATURES], table["churn"])
+    # Final model (why logistic regression: see FINAL_MODEL in config.py), refit on every labelled snapshot
+    params = best.loc[FINAL_MODEL, "params"]
+    final = build_model(FINAL_MODEL, params).fit(table[FEATURES], table["churn"])
     MODEL_PATH.parent.mkdir(exist_ok=True)
     joblib.dump(final, MODEL_PATH)
-    print(f"\nChosen on validation: {chosen}, refit on all {len(table):,} rows -> {MODEL_PATH.name}")
+    print(f"\nFinal model: {FINAL_MODEL} {params}, refit on all {len(table):,} rows -> {MODEL_PATH.name}")
 
     REPORTS_DIR.mkdir(exist_ok=True)
     best.to_csv(REPORTS_DIR / "validation_results.csv")
     test_results.to_csv(REPORTS_DIR / "test_results.csv")
-    test_scores = test[["household_key", "churn"] + FEATURES].copy()
-    for name, s in scores.items():
-        test_scores[f"score_{name}"] = s
+    valid_scores.to_csv(PROCESSED_DIR / "valid_scores.csv", index=False)
     test_scores.to_csv(PROCESSED_DIR / "test_scores.csv", index=False)
 
 
