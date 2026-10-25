@@ -1,9 +1,0 @@
-relationship 64fd3a4c-6979-5dc6-a46f-3e861240d715
-	fromColumn: weekly_kpis.week_no
-	toColumn: dim_week.week_no
-
-relationship b8c27148-43cd-5f5b-b71f-dab3c7b52c67
-	crossFilteringBehavior: bothDirections
-	fromColumn: dim_week.period
-	toColumn: period_retention.period
-

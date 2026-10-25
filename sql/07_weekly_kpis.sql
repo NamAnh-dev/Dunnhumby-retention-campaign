@@ -1,4 +1,4 @@
--- Store-level KPIs per week, for the dashboard: how many households shop, how much they spend, how much is discounted.
+-- Store-level KPIs per week: how many households shop, how much they spend, how much is discounted.
 -- Step 1 (CTE): one row per household and week. Step 2: sum the households of each week.
 -- Same rules as everywhere else: a household is active in a week only if its net sales are > 0,
 -- and discounts are stored as negative numbers in the raw data, so we flip the sign.

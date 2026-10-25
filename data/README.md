@@ -28,8 +28,6 @@ python -m src.data
 This runs every SQL file in `sql/` over the three CSV files (with DuckDB) and saves the results in `data/processed/`.
 The data-quality checks are in `notebooks/01_eda_sql.ipynb`.
 
-The Power BI report does **not** need these files: it reads the small summary tables in `reports/dashboard/`.
-
 ## Notes on the data (verify each one in the EDA notebook)
 
 - `transaction_data` grain is one row per product line, not per basket. The same `basket_id` can contain many rows.
