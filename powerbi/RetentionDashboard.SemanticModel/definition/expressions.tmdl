@@ -1,6 +1,0 @@
-/// Folder with the CSV files (the repo's reports\ folder). Change it in Transform data > Edit parameters.
-expression DataFolder = "D:\Kaggle\Test\Advanced\dunnhumby-retention\reports\" meta [IsParameterQuery = true, Type = "Text", IsParameterQueryRequired = true]
-	lineageTag: 1acacc75-b986-5aa0-896e-144e2dc7ded6
-
-	annotation PBI_ResultType = Text
-

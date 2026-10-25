@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 
-from src.business import compare_rankings, targeting_table
 from src.config import PREDICTION_WEEKS, TEST_CUTOFF, VALID_CUTOFFS
 from src.features import FEATURES
 from src.train import evaluate, make_preprocessor, precision_at_top, time_split
@@ -43,22 +42,3 @@ def test_preprocessor_handles_missing_and_new_categories():
     out = prep.transform(new)
     assert not np.isnan(out).any()                     # every missing value is filled
     assert out.shape[1] == prep.transform(train).shape[1]
-
-
-def test_targeting_table():
-    y = [1, 0, 1, 0]
-    score = [0.9, 0.8, 0.2, 0.1]
-    sales = [100, 50, 300, 10]
-    row = targeting_table(y, score, sales, fractions=[0.5]).iloc[0]
-    assert row["households"] == 2                      # the two highest scores
-    assert row["churners_reached"] == 1
-    assert row["sales_at_risk_reached"] == 100         # only churners count, the non-churner's 50 is not at risk
-    assert row["share_of_sales_at_risk"] == 0.25       # 100 of the 400 spent by all churners
-
-
-def test_compare_rankings():
-    y = [1, 0, 1, 0]
-    sales = [100, 50, 300, 10]
-    out = compare_rankings(y, {"by_risk": [0.9, 0.8, 0.2, 0.1], "by_sales": sales}, sales, fraction=0.25)
-    assert out.loc["by_risk", "share_of_sales_at_risk"] == 0.25      # picks household 1 (100 of 400)
-    assert out.loc["by_sales", "share_of_sales_at_risk"] == 0.75     # picks household 3 (300 of 400)

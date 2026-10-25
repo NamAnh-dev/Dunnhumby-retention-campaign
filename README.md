@@ -3,7 +3,7 @@
 **Which households are about to stop shopping, and which of them are worth a retention coupon?**
 
 Data: dunnhumby *The Complete Journey* (2.6M transactions, 2,500 households, 102 weeks).
-Tools: SQL (DuckDB), pandas, scikit-learn, LightGBM, SHAP, Power BI, pytest.
+Tools: SQL (DuckDB), pandas, scikit-learn, LightGBM, SHAP, pytest.
 
 ![Churners and sales at risk reached by each ranking](reports/figures/targeting_curve.png)
 
@@ -15,7 +15,7 @@ Tools: SQL (DuckDB), pandas, scikit-learn, LightGBM, SHAP, Power BI, pytest.
 | **Analysis (SQL)** | 7 DuckDB queries (KPIs, RFM segments, retention, purchase gaps), each unit-tested. Champions are 24% of households but 47% of sales. |
 | **Model** | 8-week churn model with a time-based split. The top 10% riskiest households contain 84 churners vs ~19 at random (4.5x lift). |
 | **Recommendation** | Rank households by **churn risk × recent sales**: with the same budget it reaches **43%** of the sales at risk, vs 15% when ranking by risk only and 25% with a simple rule without the model. Test the real coupon effect with an A/B test first. |
-| **Deliverables** | 4 notebooks, Power BI report (3 pages), coupon list script, 24 unit tests |
+| **Deliverables** | 4 notebooks, coupon list script, 23 unit tests |
 
 ## 1. Problem and data
 
@@ -42,9 +42,9 @@ All data preparation runs in SQL with **DuckDB**, directly on the raw CSVs. Ever
 | [`04_department_sales`](sql/04_department_sales.sql) | `JOIN`, window `SUM() OVER ()` | sales share by department |
 | [`05_purchase_gaps`](sql/05_purchase_gaps.sql) | `LAG() OVER (PARTITION BY ...)` | silent weeks between two purchases |
 | [`06_household_demographics`](sql/06_household_demographics.sql) | `LEFT JOIN`, `CASE` cleaning | text ranges → numbers (`"50-74K"` → 62), unknown → `NULL` |
-| [`07_weekly_kpis`](sql/07_weekly_kpis.sql) | CTE, conditional `COUNT` | store KPIs per week (for the dashboard) |
+| [`07_weekly_kpis`](sql/07_weekly_kpis.sql) | CTE, conditional `COUNT` | store KPIs per week |
 
-**KPI definitions** (the same in SQL, Python and Power BI):
+**KPI definitions** (the same in SQL and Python):
 
 | KPI | Definition |
 |---|---|
@@ -66,16 +66,7 @@ discounts are stored as negative numbers (the SQL flips the sign); demographics 
 3. **Churners are small spenders.** Median sales in the last 12 weeks: 65 for churners vs 336 for the others. Targeting by risk alone spends coupons on small losses.
 4. **Possible survey bias.** Households with demographics almost never churn (1% vs 11%). One possible reason (not verified): only loyal households answered the survey.
 
-## 4. Power BI dashboard
-
-![Power BI report: business overview page](reports/figures/powerbi_overview.png)
-
-Three pages: **business overview** (KPI cards, week slicer, trends), **customer segments** (share of households vs share of sales), **churn & coupons** (churn rate per snapshot, coupon list).
-The data model has a week dimension (`dim_week`) and DAX measures (`DIVIDE`, `CALCULATE` + `ALL`, `VAR`, `RANKX`).
-Open [`powerbi/RetentionDashboard.pbip`](powerbi) in Power BI Desktop (see [`powerbi/README.md`](powerbi/README.md)) or read the [PDF export](reports/RetentionDashboard.pdf).
-The report only needs the small CSV files in [`reports/dashboard/`](reports/dashboard), not the raw data.
-
-## 5. Churn model
+## 4. Churn model
 
 ![Snapshot timeline](reports/figures/snapshot_timeline.png)
 
@@ -114,7 +105,7 @@ Contacting the top **10%** reaches **44%** of all churners; the top 20% reaches 
 | Which threshold? | 0.5, best F1, top 10% | 0.5 flags nobody | top-k for a fixed budget |
 | Need demographics? | validate with / without | 0.348 vs 0.349 | behaviour carries the signal |
 
-## 6. Recommendation: who gets a coupon?
+## 5. Recommendation: who gets a coupon?
 
 On the test week, with a budget of 10% (231 households). *Sales at risk* = what the churners spent in the last 12 weeks.
 
@@ -127,7 +118,7 @@ On the test week, with a budget of 10% (231 households). *Sales at risk* = what 
 
 1. **Send coupons by expected sales lost** (churn risk × recent sales). It finds fewer churners, but the ones who matter most for revenue. Without the model (last two rows) the same budget reaches much less of the sales at risk.
 2. **Run an A/B test before rollout:** give the coupon to a random half of the list and compare churn after 8 weeks. This data cannot tell how many churners a coupon really keeps.
-3. **Watch the churn rate:** it rose from 6.8% (week 86) to 8.2% (week 94). Track it in the Power BI report and retrain the model regularly.
+3. **Watch the churn rate:** it rose from 6.8% (week 86) to 8.2% (week 94). Track it every week and retrain the model regularly.
 4. **Check how demographics are collected** before using them in any decision.
 
 `python -m src.predict` scores the 2,310 households at risk in the latest week and writes the top 10% to [`reports/coupon_list.csv`](reports/coupon_list.csv).
@@ -138,7 +129,7 @@ On the test week, with a budget of 10% (231 households). *Sales at risk* = what 
 python -m venv .venv
 .venv\Scripts\activate             # macOS/Linux: source .venv/bin/activate
 pip install -r requirements.txt
-pytest -q                          # 24 unit tests, no raw data needed
+pytest -q                          # 23 unit tests, no raw data needed
 ```
 
 To rebuild everything, download the dataset from Kaggle (see [`data/README.md`](data/README.md)), put the CSVs in `data/raw/`, then:
@@ -148,7 +139,6 @@ python -m src.data             # run the 7 SQL files             -> data/process
 python -m src.features         # churn labels + features         -> data/processed/model_table.csv
 python -m src.train            # validate, test, save the model  -> models/churn_model.joblib
 python -m src.predict          # score the latest week           -> reports/coupon_list.csv
-python -m src.dashboard_data   # summary tables for Power BI     -> reports/dashboard/
 ```
 
 Notebooks, in order: [`01`](notebooks/01_eda_sql.ipynb) SQL & EDA → [`02`](notebooks/02_modeling.ipynb) features & models → [`03`](notebooks/03_explain_and_business.ipynb) SHAP & targeting → [`04`](notebooks/04_experiments.ipynb) experiments.
@@ -162,13 +152,11 @@ dunnhumby-retention/
 │   ├── features.py        churn labels + features at a cutoff week
 │   ├── train.py           preprocessing, validation, test, saves the final model
 │   ├── experiments.py     class weights, bootstrap, threshold helpers (notebook 04)
-│   ├── business.py        churners and sales at risk reached by a ranking
-│   ├── predict.py         scores the latest week -> coupon list
-│   └── dashboard_data.py  small summary tables for Power BI
-├── powerbi/               Power BI project: data model (DAX measures) + 3 report pages
+│   ├── business.py        RFM segment shares, churners and sales at risk reached by a ranking
+│   └── predict.py         scores the latest week -> coupon list
 ├── notebooks/             01 SQL & EDA · 02 modelling · 03 SHAP & business · 04 experiments
-├── tests/                 24 unit tests (SQL, labels, no future data, pipeline, metrics)
-└── reports/               figures, results, coupon list, Power BI tables and PDF export
+├── tests/                 23 unit tests (SQL, labels, no future data, pipeline, metrics)
+└── reports/               figures, results, coupon list
 ```
 
 ## Lessons and limitations
