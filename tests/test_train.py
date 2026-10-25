@@ -38,16 +38,13 @@ def test_time_split_refuses_overlapping_label_windows():
         time_split(table)
 
 
-def test_preprocessor_handles_missing_and_new_categories():
+def test_preprocessor_logs_skewed_columns_and_scales_every_feature():
     rng = np.random.default_rng(0)
-    train = pd.DataFrame(rng.random((20, len(FEATURES))), columns=FEATURES)
-    train["age_group"] = ["25-34", None] * 10
-    train["homeowner"] = ["owner", None] * 10
-    train.loc[::2, ["income_k", "household_size"]] = np.nan
-    new = train.head(3).copy()
-    new["age_group"] = "an age group never seen"
-
+    train = pd.DataFrame(rng.exponential(10, (200, len(FEATURES))), columns=FEATURES)
     prep = make_preprocessor().fit(train)
-    out = prep.transform(new)
-    assert not np.isnan(out).any()                     # every missing value is filled
-    assert out.shape[1] == prep.transform(train).shape[1]
+    out = pd.DataFrame(prep.transform(train), columns=prep.get_feature_names_out())
+
+    assert sorted(out.columns) == sorted(FEATURES)                    # one column per feature, nothing added
+    assert np.allclose(out.mean(), 0) and np.allclose(out.std(ddof=0), 1)
+    logged = np.log1p(train["sales_12w"])                             # skewed columns get log1p before scaling
+    assert np.allclose(out["sales_12w"], (logged - logged.mean()) / logged.std(ddof=0))

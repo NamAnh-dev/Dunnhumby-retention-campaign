@@ -55,7 +55,7 @@ All data preparation runs in SQL with **DuckDB**, directly on the raw CSVs. Ever
 | 8-week churn rate | share of at-risk households with no purchase in the next 8 weeks |
 
 **Data quality:** no missing values or duplicated rows in the transactions; 0.7% of lines are returns or free items (kept in net sales);
-discounts are stored as negative numbers (the SQL flips the sign); demographics are missing for 68% of households (handled in the model pipeline).
+discounts are stored as negative numbers (the SQL flips the sign); demographics are missing for 68% of households (the model does not use them, see below).
 
 ## 3. Key findings
 
@@ -71,8 +71,8 @@ discounts are stored as negative numbers (the SQL flips the sign); demographics 
 ![Snapshot timeline](reports/figures/snapshot_timeline.png)
 
 - **9 snapshots** (cutoff weeks 30, 38, …, 94) → **20,588** rows (household × cutoff week), churn rate **~7%**.
-- **Features** ([`src/features.py`](src/features.py)): 12 behaviour features (recency, how regularly the household buys, recent sales and baskets, discounts, coupons, departments) + 5 demographics. They only use weeks ≤ cutoff (tested in [`tests/test_features.py`](tests/test_features.py)).
-- **Preprocessing** (`log1p`, median imputation, one-hot) sits inside a scikit-learn `Pipeline`, so it is fitted on training data only.
+- **Features** ([`src/features.py`](src/features.py)): 12 behaviour features (recency, how regularly the household buys, recent sales and baskets, discounts, coupons, departments). Demographics are not used by the model: they add nothing and look biased (see below). The features only use weeks ≤ cutoff (tested in [`tests/test_features.py`](tests/test_features.py)).
+- **Preprocessing** (`log1p` for the skewed amounts, then standardizing) sits inside a scikit-learn `Pipeline`, so it is fitted on training data only.
 - **Split by time, not at random**, because the same household appears in several snapshots and in real use we predict the future from the past:
   - **validation** on weeks 70, 78 and 86: for each week, train on the earlier snapshots only and score that week; a setting's score is the average PR-AUC of the 3 weeks (one week alone is noisy);
   - **test** on week 94, used once at the end;

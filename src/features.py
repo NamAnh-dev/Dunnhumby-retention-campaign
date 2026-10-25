@@ -5,7 +5,7 @@ For a cutoff week c:
   * at risk     : at least one active week in weeks c-11 .. c   (OBSERVATION_WEEKS = 12)
   * churn = 1   : no active week in weeks c+1 .. c+8            (PREDICTION_WEEKS = 8)
 Behaviour features only use weeks <= c, so the model never sees the period it predicts (no leakage).
-Demographics do not change over time, so they are simply joined on household_key.
+Demographics do not change over time, so they are simply joined on household_key (for EDA and one experiment only).
 
 Usage (from the repo root, after python -m src.data):
     python -m src.features
@@ -30,10 +30,12 @@ BEHAVIOUR_FEATURES = [
     "coupon_items_12w",       # items bought with a coupon in the last 12 weeks
     "avg_departments_12w",    # departments per purchase week: does the household do its full shopping here?
 ]
+# The model uses behaviour only. Demographics are kept in the model table for EDA and for one experiment
+# (notebook 02): they do not improve the model, and they look biased (households that answered the survey
+# almost never churn).
+FEATURES = BEHAVIOUR_FEATURES
 NUMERIC_DEMOGRAPHICS = ["has_demographics", "income_k", "household_size"]   # NaN for ~2/3 of households
 CATEGORICAL_DEMOGRAPHICS = ["age_group", "homeowner"]
-NUMERIC_FEATURES = BEHAVIOUR_FEATURES + NUMERIC_DEMOGRAPHICS
-FEATURES = NUMERIC_FEATURES + CATEGORICAL_DEMOGRAPHICS
 
 
 def active_weeks(weekly: pd.DataFrame) -> pd.DataFrame:
@@ -110,11 +112,10 @@ def build_model_table(weekly: pd.DataFrame, demographics: pd.DataFrame) -> pd.Da
     return table.merge(demographics, on="household_key", how="left", validate="many_to_one")
 
 
-def build_scoring_table(weekly: pd.DataFrame, demographics: pd.DataFrame, cutoff: int) -> pd.DataFrame:
+def build_scoring_table(weekly: pd.DataFrame, cutoff: int) -> pd.DataFrame:
     """Features for the households at risk at `cutoff`, without a label (the future is unknown): used to score new data."""
     households = pd.DataFrame({"household_key": at_risk_households(weekly, cutoff)})
-    table = households.merge(build_features(weekly, cutoff), on="household_key", how="left")
-    return table.merge(demographics, on="household_key", how="left", validate="one_to_one")
+    return households.merge(build_features(weekly, cutoff), on="household_key", how="left")
 
 
 def load_inputs():

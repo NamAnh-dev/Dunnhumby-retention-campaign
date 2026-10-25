@@ -24,11 +24,11 @@ def main(argv=None):
     parser.add_argument("--cutoff", type=int, help="week to score (default: the last week in the data)")
     args = parser.parse_args(argv)
 
-    weekly, demographics = load_inputs()
+    weekly, _ = load_inputs()          # the model does not use demographics
     cutoff = args.cutoff or int(weekly["week_no"].max())
     model = joblib.load(MODEL_PATH)
 
-    table = build_scoring_table(weekly, demographics, cutoff)
+    table = build_scoring_table(weekly, cutoff)
     table["churn_probability"] = model.predict_proba(table[FEATURES])[:, 1]
     table["expected_sales_lost"] = table["churn_probability"] * table["sales_12w"]
     table = table.sort_values("expected_sales_lost", ascending=False)

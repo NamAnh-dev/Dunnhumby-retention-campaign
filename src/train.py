@@ -17,20 +17,19 @@ import numpy as np
 import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import average_precision_score, roc_auc_score
 from sklearn.model_selection import ParameterGrid
 from sklearn.pipeline import Pipeline, make_pipeline
-from sklearn.preprocessing import FunctionTransformer, OneHotEncoder, StandardScaler
+from sklearn.preprocessing import FunctionTransformer, StandardScaler
 
 from src.config import (MODEL_PATH, OBSERVATION_WEEKS, PREDICTION_WEEKS, PROCESSED_DIR,
                         REPORTS_DIR, SEED, TEST_CUTOFF, TOP_FRACTION, VALID_CUTOFF)
-from src.features import CATEGORICAL_DEMOGRAPHICS, FEATURES, NUMERIC_FEATURES
+from src.features import FEATURES
 
 # Long right tail (a few households spend a lot): log1p makes them easier for the linear model
 SKEWED = ["baskets_12w", "sales_12w", "avg_basket_value_12w", "coupon_items_12w"]
-OTHER_NUMERIC = [c for c in NUMERIC_FEATURES if c not in SKEWED]
+OTHER = [c for c in FEATURES if c not in SKEWED]
 
 
 def time_split(table: pd.DataFrame):
@@ -46,16 +45,15 @@ def time_split(table: pd.DataFrame):
 
 
 def make_preprocessor() -> ColumnTransformer:
-    """Same preprocessing for every model, fitted on the training data only (inside the pipeline)."""
+    """Same preprocessing for every model, fitted on the training data only (inside the pipeline).
+
+    Standardizing puts every feature on the same scale, so the logistic coefficients can be compared.
+    The behaviour features have no missing values (no purchase in a window = 0), so nothing needs to be filled.
+    """
     return ColumnTransformer([
         ("skewed", make_pipeline(FunctionTransformer(np.log1p, feature_names_out="one-to-one"),
                                  StandardScaler()), SKEWED),
-        # income_k / household_size are missing for ~2/3 of households: fill with the median,
-        # the has_demographics column tells the model which values were filled
-        ("numeric", make_pipeline(SimpleImputer(strategy="median"), StandardScaler()), OTHER_NUMERIC),
-        ("categorical", make_pipeline(SimpleImputer(strategy="constant", fill_value="unknown"),
-                                      OneHotEncoder(handle_unknown="ignore", sparse_output=False)),
-         CATEGORICAL_DEMOGRAPHICS),
+        ("other", StandardScaler(), OTHER),
     ], verbose_feature_names_out=False)
 
 
