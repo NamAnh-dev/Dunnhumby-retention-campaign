@@ -119,14 +119,17 @@ def validation_score(model, train: pd.DataFrame, valid: pd.DataFrame) -> float:
 
 
 def tune(train: pd.DataFrame, valid: pd.DataFrame) -> pd.DataFrame:
-    """Score every setting of every model on validation. Returns one row per model with its best setting."""
+    """Score every setting of every model on validation. One row per setting (the recency rule has no settings)."""
     rows = [{"model": "recency_rule", "params": {}, "valid_pr_auc": validation_score(RecencyRule(), train, valid)}]
     for name, grid in GRIDS.items():
         for params in ParameterGrid(grid):
             model = make_model(name).set_params(**params)
             rows.append({"model": name, "params": params, "valid_pr_auc": validation_score(model, train, valid)})
-            print(f"{name:14s} {str(params):55s} valid PR-AUC {rows[-1]['valid_pr_auc']:.3f}")
-    results = pd.DataFrame(rows)
+    return pd.DataFrame(rows)
+
+
+def best_settings(results: pd.DataFrame) -> pd.DataFrame:
+    """The setting with the highest validation PR-AUC for each model, one row per model."""
     best_rows = results.groupby("model", sort=False)["valid_pr_auc"].idxmax()
     return results.loc[best_rows].set_index("model")
 
@@ -150,9 +153,10 @@ def main():
     print(f"train {len(train):,} rows (cutoffs < {VALID_CUTOFF}) | valid {len(valid):,} rows (cutoff {VALID_CUTOFF}) "
           f"| test {len(test):,} rows (cutoff {TEST_CUTOFF})\n")
 
-    best = tune(train, valid)
-    print(f"\nBest setting per model (PR-AUC on validation week {VALID_CUTOFF}):")
-    print(best.round(3))
+    results = tune(train, valid)
+    print(f"PR-AUC on validation week {VALID_CUTOFF}, every setting:")
+    print(results.round(3).to_string(index=False))
+    best = best_settings(results)
 
     # Validation scores of the best settings (the same fits as in tune), kept for the notebooks
     valid_scores = score_with_best(best, train, valid)
