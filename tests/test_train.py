@@ -1,7 +1,8 @@
 import numpy as np
 import pandas as pd
+import pytest
 
-from src.config import PREDICTION_WEEKS, TEST_CUTOFF, VALID_CUTOFFS
+from src.config import PREDICTION_WEEKS, TEST_CUTOFF, VALID_CUTOFF
 from src.features import FEATURES
 from src.train import evaluate, make_preprocessor, precision_at_top, time_split
 
@@ -21,12 +22,20 @@ def test_lift_of_a_perfect_model():
     assert result["lift_top10"] == 10.0  # base rate 10%, precision in the top 10% = 100%
 
 
-def test_time_split_keeps_the_test_week_apart():
-    table = pd.DataFrame({"cutoff_week": range(30, 95, 8)})
-    dev, test = time_split(table)
+def test_time_split_train_valid_test():
+    table = pd.DataFrame({"cutoff_week": range(30, 95, 8)})      # the real snapshots: 30, 38, ..., 94
+    train, valid, test = time_split(table)
+    assert train["cutoff_week"].tolist() == [30, 38, 46, 54, 62, 70, 78]
+    assert set(valid["cutoff_week"]) == {VALID_CUTOFF}
     assert set(test["cutoff_week"]) == {TEST_CUTOFF}
-    assert dev["cutoff_week"].max() + PREDICTION_WEEKS <= TEST_CUTOFF     # no dev label window reaches the test week
-    assert set(VALID_CUTOFFS) <= set(dev["cutoff_week"])                    # every validation week is in dev
+    assert train["cutoff_week"].max() + PREDICTION_WEEKS <= VALID_CUTOFF   # train labels end before validation
+    assert VALID_CUTOFF + PREDICTION_WEEKS <= TEST_CUTOFF                   # validation labels end before test
+
+
+def test_time_split_refuses_overlapping_label_windows():
+    table = pd.DataFrame({"cutoff_week": [74, 82, 86, 94]})      # the label of week 82 looks at weeks 83..90
+    with pytest.raises(AssertionError):
+        time_split(table)
 
 
 def test_preprocessor_handles_missing_and_new_categories():

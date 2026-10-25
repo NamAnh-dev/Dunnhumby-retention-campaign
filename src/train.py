@@ -1,11 +1,9 @@
 """Train and compare churn models with a time-based split, then save the final model.
 
-  1. Split by time: dev = snapshots before the test week, test = the TEST_CUTOFF snapshot.
-  2. Validation: for each validation week (70, 78, 86) train on the earlier snapshots only and score that week.
-     A setting's validation score = its average PR-AUC over the 3 weeks (one week alone is noisy).
-  3. For each model, keep the setting with the best validation score.
-  4. Train each model on all dev snapshots and evaluate it once on the test snapshot.
-  5. The model with the best validation score is refit on ALL labelled snapshots (including the test week)
+  1. Split by time: train = snapshots 30 .. 78, validation = week 86 (VALID_CUTOFF), test = week 94 (TEST_CUTOFF).
+  2. For each model, fit every setting of a small grid on train, score it on validation (PR-AUC) and keep the best.
+  3. Refit each model's best setting on train + validation (every week before the test) and evaluate it once on test.
+  4. The model with the best validation score is refit on ALL labelled snapshots (including the test week)
      and saved to models/churn_model.joblib: this is the model used to score new weeks.
 We split by time (not at random) because the same household appears in several snapshots,
 and in real use the model always predicts the future from the past.
@@ -28,7 +26,7 @@ from sklearn.pipeline import Pipeline, make_pipeline
 from sklearn.preprocessing import FunctionTransformer, OneHotEncoder, StandardScaler
 
 from src.config import (MODEL_PATH, OBSERVATION_WEEKS, PREDICTION_WEEKS, PROCESSED_DIR,
-                        REPORTS_DIR, SEED, TEST_CUTOFF, TOP_FRACTION, VALID_CUTOFFS)
+                        REPORTS_DIR, SEED, TEST_CUTOFF, TOP_FRACTION, VALID_CUTOFF)
 from src.features import CATEGORICAL_DEMOGRAPHICS, FEATURES, NUMERIC_FEATURES
 
 # Long right tail (a few households spend a lot): log1p makes them easier for the linear model
@@ -37,12 +35,15 @@ OTHER_NUMERIC = [c for c in NUMERIC_FEATURES if c not in SKEWED]
 
 
 def time_split(table: pd.DataFrame):
-    """dev = every snapshot before the test week (training + validation), test = the test week."""
-    # The label of the last dev snapshot looks 8 weeks ahead; it must end before the test week starts
-    assert max(VALID_CUTOFFS) + PREDICTION_WEEKS <= TEST_CUTOFF
-    dev = table[table["cutoff_week"] < TEST_CUTOFF]
+    """train = snapshots before the validation week, valid = the validation week, test = the test week."""
+    train = table[table["cutoff_week"] < VALID_CUTOFF]
+    valid = table[table["cutoff_week"] == VALID_CUTOFF]
     test = table[table["cutoff_week"] == TEST_CUTOFF]
-    return dev, test
+    # A label looks PREDICTION_WEEKS ahead: it must end before the next part's cutoff,
+    # otherwise the model would learn from weeks it is later asked to predict
+    assert train["cutoff_week"].max() + PREDICTION_WEEKS <= VALID_CUTOFF
+    assert VALID_CUTOFF + PREDICTION_WEEKS <= TEST_CUTOFF
+    return train, valid, test
 
 
 def make_preprocessor() -> ColumnTransformer:
@@ -107,25 +108,19 @@ def evaluate(y, score) -> dict:
     }
 
 
-def validation_score(model, dev: pd.DataFrame) -> float:
-    """Average PR-AUC over the validation weeks. For each week, the model only learns from earlier snapshots."""
-    scores = []
-    for week in VALID_CUTOFFS:
-        train = dev[dev["cutoff_week"] < week]
-        valid = dev[dev["cutoff_week"] == week]
-        model.fit(train[FEATURES], train["churn"])
-        prob = model.predict_proba(valid[FEATURES])[:, 1]
-        scores.append(average_precision_score(valid["churn"], prob))
-    return float(np.mean(scores))
+def validation_score(model, train: pd.DataFrame, valid: pd.DataFrame) -> float:
+    """PR-AUC on the validation week of a model fitted on the training weeks."""
+    model.fit(train[FEATURES], train["churn"])
+    return float(average_precision_score(valid["churn"], model.predict_proba(valid[FEATURES])[:, 1]))
 
 
-def tune(dev: pd.DataFrame) -> pd.DataFrame:
+def tune(train: pd.DataFrame, valid: pd.DataFrame) -> pd.DataFrame:
     """Score every setting of every model on validation. Returns one row per model with its best setting."""
-    rows = [{"model": "recency_rule", "params": {}, "valid_pr_auc": validation_score(RecencyRule(), dev)}]
+    rows = [{"model": "recency_rule", "params": {}, "valid_pr_auc": validation_score(RecencyRule(), train, valid)}]
     for name, grid in GRIDS.items():
         for params in ParameterGrid(grid):
             model = make_model(name).set_params(**params)
-            rows.append({"model": name, "params": params, "valid_pr_auc": validation_score(model, dev)})
+            rows.append({"model": name, "params": params, "valid_pr_auc": validation_score(model, train, valid)})
             print(f"{name:14s} {str(params):55s} valid PR-AUC {rows[-1]['valid_pr_auc']:.3f}")
     results = pd.DataFrame(rows)
     best_rows = results.groupby("model", sort=False)["valid_pr_auc"].idxmax()
@@ -138,17 +133,19 @@ def build_model(name: str, params: dict):
 
 def main():
     table = pd.read_csv(PROCESSED_DIR / "model_table.csv")
-    dev, test = time_split(table)
-    print(f"dev {len(dev):,} rows (cutoffs < {TEST_CUTOFF}) | test {len(test):,} rows (cutoff {TEST_CUTOFF})\n")
+    train, valid, test = time_split(table)
+    print(f"train {len(train):,} rows (cutoffs < {VALID_CUTOFF}) | valid {len(valid):,} rows (cutoff {VALID_CUTOFF}) "
+          f"| test {len(test):,} rows (cutoff {TEST_CUTOFF})\n")
 
-    best = tune(dev)
-    print("\nBest setting per model (average PR-AUC over validation weeks", VALID_CUTOFFS, "):")
+    best = tune(train, valid)
+    print(f"\nBest setting per model (PR-AUC on validation week {VALID_CUTOFF}):")
     print(best.round(3))
 
-    # Test: train each model on all dev snapshots, score the test week once
+    # Test: refit each best setting on train + validation (every week before the test), score the test week once
+    before_test = pd.concat([train, valid])
     scores = {}
     for name, row in best.iterrows():
-        model = build_model(name, row["params"]).fit(dev[FEATURES], dev["churn"])
+        model = build_model(name, row["params"]).fit(before_test[FEATURES], before_test["churn"])
         scores[name] = model.predict_proba(test[FEATURES])[:, 1]
     test_results = pd.DataFrame({name: evaluate(test["churn"], s) for name, s in scores.items()}).T
     print("\nTest (reported once):")
