@@ -15,7 +15,7 @@ Tools: SQL (DuckDB), pandas, scikit-learn, SHAP, pytest.
 | **Analysis (SQL)** | 7 DuckDB queries (KPIs, RFM segments, retention, purchase gaps), each unit-tested. Champions are 36% of households but 66% of sales. |
 | **Model** | 8-week churn model with a time-based split. The top 10% riskiest households contain 82 churners vs ~19 at random (4.3x lift). |
 | **Recommendation** | Rank households by **churn risk × recent sales**: with the same budget it reaches **35%** of the sales at risk on the test week (41% on validation), vs 15% (17%) when ranking by risk only. Test the real coupon effect with an A/B test first. |
-| **Deliverables** | 4 notebooks, coupon list script, 28 unit tests |
+| **Deliverables** | 3 notebooks, coupon list script, 28 unit tests |
 
 ## 1. Problem and data
 
@@ -93,7 +93,7 @@ Both models beat the recency rule, and they are tied with each other (their inte
 So I keep **logistic regression**: its probabilities are as well calibrated as the forest's (this matters because the coupon list multiplies them by sales), and its coefficients explain the risk directly.
 Contacting the top **10%** reaches **43%** of all churners; the top 20% reaches 70%.
 
-**Explainability and experiments** ([notebook 03](notebooks/03_explain_and_business.ipynb), [notebook 04](notebooks/04_experiments.ipynb)):
+**Explainability and experiments** ([notebook 02](notebooks/02_modeling.ipynb) for the experiments, [notebook 03](notebooks/03_explain_and_business.ipynb) for the explanation):
 
 ![Logistic regression coefficients](reports/figures/logistic_coefficients.png)
 
@@ -105,7 +105,7 @@ Contacting the top **10%** reaches **43%** of all churners; the top 20% reaches 
 |---|---|---|---|
 | Which model? | logistic, random forest, small grid each | tied, both beat the baseline | logistic regression: as good, easier to explain |
 | Class imbalance? | `class_weight="balanced"` | no ranking gain; mean predicted churn goes from 7% to 29% | train on the real data, use PR-AUC / top-k |
-| Which threshold? | 0.5, best F1, top 10% | 0.5 flags nobody | top-k for a fixed budget |
+| Which threshold? | 0.5, best F1, top 10% | 0.5 flags 1 household of 2,316 | top-k for a fixed budget |
 | Need demographics? | validate with / without | 0.296 vs 0.293 | behaviour carries the signal |
 
 ## 5. Recommendation: who gets a coupon?
@@ -147,7 +147,7 @@ python -m src.train            # validate, test, save the model  -> models/churn
 python -m src.predict          # score the latest week           -> reports/coupon_list.csv
 ```
 
-Notebooks, in order: [`01`](notebooks/01_eda_sql.ipynb) SQL & EDA → [`02`](notebooks/02_modeling.ipynb) features & models → [`03`](notebooks/03_explain_and_business.ipynb) SHAP & targeting → [`04`](notebooks/04_experiments.ipynb) experiments.
+Notebooks, in order: [`01`](notebooks/01_eda_sql.ipynb) SQL & EDA → [`02`](notebooks/02_modeling.ipynb) features, models & experiments → [`03`](notebooks/03_explain_and_business.ipynb) explanation & coupon targeting.
 
 ```
 dunnhumby-retention/
@@ -156,11 +156,10 @@ dunnhumby-retention/
 │   ├── config.py          all settings: churn windows, validation/test weeks, coupon budget
 │   ├── data.py            load CSVs, data-quality report, run the SQL files
 │   ├── features.py        churn labels + features at a cutoff week
-│   ├── train.py           preprocessing, validation, test, saves the final model
-│   ├── experiments.py     class weights, bootstrap, threshold helpers (notebook 04)
+│   ├── train.py           split, models, validation, test, bootstrap / class weight / threshold checks, final model
 │   ├── business.py        RFM segment shares, churners and sales at risk reached by a ranking
 │   └── predict.py         scores the latest week -> coupon list
-├── notebooks/             01 SQL & EDA · 02 modelling · 03 SHAP & business · 04 experiments
+├── notebooks/             01 SQL & EDA · 02 modelling & experiments · 03 explanation & business
 ├── tests/                 28 unit tests (SQL, labels, no future data, pipeline, metrics)
 └── reports/               figures, results, coupon list
 ```
