@@ -37,3 +37,5 @@ def test_compare_rankings():
     out = compare_rankings(y, {"by_risk": [0.9, 0.8, 0.2, 0.1], "by_sales": sales}, sales, fraction=0.25)
     assert out.loc["by_risk", "share_of_sales_at_risk"] == 0.25      # picks household 1 (100 of 400)
     assert out.loc["by_sales", "share_of_sales_at_risk"] == 0.75     # picks household 3 (300 of 400)
+    half = compare_rankings(y, {"by_risk": [0.9, 0.8, 0.2, 0.1]}, sales, fraction=0.5)
+    assert half.loc["by_risk", "share_not_churning"] == 0.5           # households 1 and 2: only household 1 churns

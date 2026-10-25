@@ -48,6 +48,11 @@ def targeting_table(y, score, sales, fractions=(0.05, 0.10, 0.20, 0.30, 0.50, 1.
 
 
 def compare_rankings(y, rankings: dict, sales, fraction=0.10) -> pd.DataFrame:
-    """One row per ranking ({name: score}), all with the same budget (`fraction` of the households)."""
+    """One row per ranking ({name: score}), all with the same budget (`fraction` of the households).
+
+    share_not_churning = households in the list that would not have churned anyway: for them the coupon is only a discount.
+    """
     rows = {name: targeting_table(y, score, sales, fractions=[fraction]).iloc[0] for name, score in rankings.items()}
-    return pd.DataFrame(rows).T[["households", "churners_reached", "share_of_all_churners", "share_of_sales_at_risk"]]
+    out = pd.DataFrame(rows).T[["households", "churners_reached", "share_of_all_churners", "share_of_sales_at_risk"]]
+    out["share_not_churning"] = 1 - out["churners_reached"] / out["households"]
+    return out
