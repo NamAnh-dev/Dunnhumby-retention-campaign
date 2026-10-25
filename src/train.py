@@ -58,13 +58,20 @@ def make_preprocessor() -> ColumnTransformer:
 
 
 class RecencyRule:
-    """Baseline without machine learning: the longer since the last purchase, the higher the risk."""
+    """Baseline without machine learning: the longer since the last purchase, the higher the risk.
+
+    recency_weeks has only 12 values (0..11), so many households tie, and the top 10% would then depend on the
+    row order of the table. Ties are broken by active_weeks_12w: fewer purchase weeks = riskier. Its weight (0.01)
+    is smaller than one week of recency (1/12), so it never changes the recency order.
+    """
 
     def fit(self, X, y):
         return self
 
     def predict_proba(self, X):
-        risk = X["recency_weeks"].to_numpy(dtype=float) / OBSERVATION_WEEKS   # at-risk households have recency 0..11
+        recency = X["recency_weeks"].to_numpy(dtype=float) / OBSERVATION_WEEKS           # 0 .. 11/12
+        inactive = 1 - X["active_weeks_12w"].to_numpy(dtype=float) / OBSERVATION_WEEKS   # 0 .. 11/12
+        risk = recency + 0.01 * inactive
         return np.column_stack([1 - risk, risk])
 
 
@@ -90,7 +97,7 @@ GRIDS = {
 def precision_at_top(y, score, fraction=TOP_FRACTION) -> float:
     """Share of real churners among the `fraction` of households with the highest score."""
     k = max(1, int(len(y) * fraction))
-    top = np.argsort(-np.asarray(score))[:k]
+    top = np.argsort(-np.asarray(score), kind="stable")[:k]     # stable: ties keep the table order on every machine
     return float(np.asarray(y)[top].mean())
 
 
