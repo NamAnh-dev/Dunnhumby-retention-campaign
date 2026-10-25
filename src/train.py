@@ -15,7 +15,6 @@ Usage (from the repo root, after python -m src.features):
 import joblib
 import numpy as np
 import pandas as pd
-from lightgbm import LGBMClassifier
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
@@ -72,12 +71,13 @@ class RecencyRule:
 
 
 def make_model(name: str) -> Pipeline:
-    """A new, untrained pipeline (preprocessing + classifier)."""
+    """A new, untrained pipeline (preprocessing + classifier).
+
+    Two models are enough to compare a linear model with a tree model. LightGBM was tried before and tied with both.
+    """
     classifiers = {
         "logistic": LogisticRegression(max_iter=2000),
         "random_forest": RandomForestClassifier(n_estimators=200, random_state=SEED, n_jobs=-1),
-        "lightgbm": LGBMClassifier(n_estimators=300, min_child_samples=50, subsample=0.8, subsample_freq=1,
-                                   colsample_bytree=0.8, random_state=SEED, verbose=-1),
     }
     return Pipeline([("prep", make_preprocessor()), ("clf", classifiers[name])])
 
@@ -86,7 +86,6 @@ def make_model(name: str) -> Pipeline:
 GRIDS = {
     "logistic": {"clf__C": [0.01, 0.1, 1, 10]},
     "random_forest": {"clf__max_depth": [4, 8, 12], "clf__min_samples_leaf": [20, 50, 100]},
-    "lightgbm": {"clf__num_leaves": [7, 15, 31], "clf__learning_rate": [0.02, 0.05]},
 }
 
 

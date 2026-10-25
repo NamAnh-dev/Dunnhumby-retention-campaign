@@ -3,7 +3,7 @@
 **Which households are about to stop shopping, and which of them are worth a retention coupon?**
 
 Data: dunnhumby *The Complete Journey* (2.6M transactions, 2,500 households, 102 weeks).
-Tools: SQL (DuckDB), pandas, scikit-learn, LightGBM, SHAP, pytest.
+Tools: SQL (DuckDB), pandas, scikit-learn, SHAP, pytest.
 
 ![Churners and sales at risk reached by each ranking](reports/figures/targeting_curve.png)
 
@@ -85,7 +85,8 @@ discounts are stored as negative numbers (the SQL flips the sign); demographics 
 | Recency rule *(baseline, no ML)* | 0.763 | 0.234 [0.19, 0.28] | 0.316 | 3.9x |
 | Logistic regression | 0.857 | 0.322 [0.27, 0.39] | 0.372 | 4.6x |
 | **Random forest** *(chosen on validation)* | 0.856 | 0.329 [0.27, 0.40] | 0.364 | 4.5x |
-| LightGBM | 0.857 | 0.333 [0.28, 0.40] | 0.372 | 4.6x |
+
+LightGBM was tried too and tied with both models, so it was dropped: two models are enough to compare a linear model with a tree model.
 
 > **Why not accuracy?** With 8% churners, predicting "no churn" for everyone already scores 92% accuracy. PR-AUC and precision in the top 10% (the coupon budget) show what matters.
 
@@ -100,7 +101,7 @@ Contacting the top **10%** reaches **44%** of all churners; the top 20% reaches 
 
 | Question | What I tried | Result | Decision |
 |---|---|---|---|
-| Which model? | logistic, random forest, LightGBM, small grid each | close to each other, all beat the baseline | keep the one chosen on validation |
+| Which model? | logistic, random forest, small grid each | close to each other, all beat the baseline | keep the one chosen on validation |
 | Class imbalance? | `class_weight="balanced"` | no ranking gain; mean predicted churn goes from 7% to 29% | train on the real data, use PR-AUC / top-k |
 | Which threshold? | 0.5, best F1, top 10% | 0.5 flags nobody | top-k for a fixed budget |
 | Need demographics? | validate with / without | 0.348 vs 0.349 | behaviour carries the signal |
