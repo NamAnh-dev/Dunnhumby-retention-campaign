@@ -12,10 +12,10 @@ Tools: SQL (DuckDB), pandas, scikit-learn, SHAP, pytest.
 | | |
 |---|---|
 | **Business question** | A grocery retailer can send retention coupons to about 10% of its active households. Who should get them? |
-| **Analysis (SQL)** | 7 DuckDB queries (KPIs, RFM segments, retention, purchase gaps), each unit-tested. Champions are 24% of households but 47% of sales. |
+| **Analysis (SQL)** | 7 DuckDB queries (KPIs, RFM segments, retention, purchase gaps), each unit-tested. Champions are 36% of households but 66% of sales. |
 | **Model** | 8-week churn model with a time-based split. The top 10% riskiest households contain 82 churners vs ~19 at random (4.3x lift). |
 | **Recommendation** | Rank households by **churn risk × recent sales**: with the same budget it reaches **35%** of the sales at risk on the test week (41% on validation), vs 15% (17%) when ranking by risk only. Test the real coupon effect with an A/B test first. |
-| **Deliverables** | 4 notebooks, coupon list script, 23 unit tests |
+| **Deliverables** | 4 notebooks, coupon list script, 28 unit tests |
 
 ## 1. Problem and data
 
@@ -37,7 +37,7 @@ All data preparation runs in SQL with **DuckDB**, directly on the raw CSVs. Ever
 | Query | SQL technique | Output |
 |---|---|---|
 | [`01_weekly_activity`](sql/01_weekly_activity.sql) | `GROUP BY`, `COUNT(DISTINCT)`, `LEFT JOIN`, `CASE` | household × week activity (123,976 rows) |
-| [`02_rfm`](sql/02_rfm.sql) | CTEs, window function `NTILE(5)` | RFM scores and 5 customer segments |
+| [`02_rfm`](sql/02_rfm.sql) | CTEs, `CASE`, window function `NTILE(5)` | 5 customer segments from R and F; M shows what each segment is worth |
 | [`03_period_retention`](sql/03_period_retention.sql) | self `LEFT JOIN` | retention from one 4-week period to the next |
 | [`04_department_sales`](sql/04_department_sales.sql) | `JOIN`, window `SUM() OVER ()` | sales share by department |
 | [`05_purchase_gaps`](sql/05_purchase_gaps.sql) | `LAG() OVER (PARTITION BY ...)` | silent weeks between two purchases |
@@ -62,7 +62,7 @@ discounts are stored as negative numbers (the SQL flips the sign); demographics 
 ![RFM segments](reports/figures/rfm_segments.png)
 
 1. **The business is stable and churn is rare.** After a warm-up of ~17 weeks: ~1,300 active households and ~86k net sales per week, and ~90% of the households active in a 4-week period come back in the next one.
-2. **Sales are concentrated.** Champions are 24% of households but 47% of sales; "lost" households are 26% of households and only 7% of sales.
+2. **Sales are concentrated.** Champions (bought in the last 2 weeks and among the 40% most regular shoppers) are 36% of households but 66% of sales; "lost" households are 16% of households and only 4% of sales.
 3. **Churners are small spenders.** Median sales in the last 12 weeks: 65 for churners vs 336 for the others. Targeting by risk alone spends coupons on small losses.
 4. **Possible survey bias.** Households with demographics almost never churn (1% vs 11%). One possible reason (not verified): only loyal households answered the survey.
 
@@ -135,7 +135,7 @@ One week has few churners, so the table shows the test week and, in brackets, th
 python -m venv .venv
 .venv\Scripts\activate             # macOS/Linux: source .venv/bin/activate
 pip install -r requirements.txt
-pytest -q                          # 23 unit tests, no raw data needed
+pytest -q                          # 28 unit tests, no raw data needed
 ```
 
 To rebuild everything, download the dataset from Kaggle (see [`data/README.md`](data/README.md)), put the CSVs in `data/raw/`, then:
@@ -161,7 +161,7 @@ dunnhumby-retention/
 │   ├── business.py        RFM segment shares, churners and sales at risk reached by a ranking
 │   └── predict.py         scores the latest week -> coupon list
 ├── notebooks/             01 SQL & EDA · 02 modelling · 03 SHAP & business · 04 experiments
-├── tests/                 23 unit tests (SQL, labels, no future data, pipeline, metrics)
+├── tests/                 28 unit tests (SQL, labels, no future data, pipeline, metrics)
 └── reports/               figures, results, coupon list
 ```
 
