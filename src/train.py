@@ -3,8 +3,8 @@
   1. Split by time: train = snapshots 30 .. 78, validation = week 86 (VALID_CUTOFF), test = week 94 (TEST_CUTOFF).
   2. For each model, fit every setting of a small grid on train, score it on validation (PR-AUC) and keep the best.
   3. Refit each model's best setting on train + validation (every week before the test) and evaluate it once on test.
-  4. The model with the best validation score is refit on ALL labelled snapshots (including the test week)
-     and saved to models/churn_model.joblib: this is the model used to score new weeks.
+  4. The final model (FINAL_MODEL in config.py, with its best validation setting) is refit on ALL labelled
+     snapshots (including the test week) and saved to models/churn_model.joblib: this is the model used to score new weeks.
 We split by time (not at random) because the same household appears in several snapshots,
 and in real use the model always predicts the future from the past.
 
@@ -23,7 +23,7 @@ from sklearn.model_selection import ParameterGrid
 from sklearn.pipeline import Pipeline, make_pipeline
 from sklearn.preprocessing import FunctionTransformer, StandardScaler
 
-from src.config import (MODEL_PATH, OBSERVATION_WEEKS, PREDICTION_WEEKS, PROCESSED_DIR,
+from src.config import (FINAL_MODEL, MODEL_PATH, OBSERVATION_WEEKS, PREDICTION_WEEKS, PROCESSED_DIR,
                         REPORTS_DIR, SEED, TEST_CUTOFF, TOP_FRACTION, VALID_CUTOFF)
 from src.features import FEATURES
 
@@ -155,12 +155,12 @@ def main():
     print("\nTest (reported once):")
     print(test_results.round(3))
 
-    # Final model: chosen on validation (not on test), then refit on every labelled snapshot
-    chosen = best.drop("recency_rule")["valid_pr_auc"].idxmax()
-    final = build_model(chosen, best.loc[chosen, "params"]).fit(table[FEATURES], table["churn"])
+    # Final model (why logistic regression: see FINAL_MODEL in config.py), refit on every labelled snapshot
+    params = best.loc[FINAL_MODEL, "params"]
+    final = build_model(FINAL_MODEL, params).fit(table[FEATURES], table["churn"])
     MODEL_PATH.parent.mkdir(exist_ok=True)
     joblib.dump(final, MODEL_PATH)
-    print(f"\nChosen on validation: {chosen}, refit on all {len(table):,} rows -> {MODEL_PATH.name}")
+    print(f"\nFinal model: {FINAL_MODEL} {params}, refit on all {len(table):,} rows -> {MODEL_PATH.name}")
 
     REPORTS_DIR.mkdir(exist_ok=True)
     best.to_csv(REPORTS_DIR / "validation_results.csv")

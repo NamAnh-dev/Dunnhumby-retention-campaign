@@ -1,5 +1,4 @@
 model,params,valid_pr_auc
-recency_rule,{},0.2511253514858805
-logistic,{'clf__C': 1},0.33403142742783404
-random_forest,"{'clf__max_depth': 12, 'clf__min_samples_leaf': 50}",0.34804130661997074
-lightgbm,"{'clf__learning_rate': 0.02, 'clf__num_leaves': 7}",0.337553247240659
+recency_rule,{},0.2561384356899446
+logistic,{'clf__C': 0.1},0.2962564157197227
+random_forest,"{'clf__max_depth': 12, 'clf__min_samples_leaf': 50}",0.32232711036000716

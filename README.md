@@ -74,23 +74,23 @@ discounts are stored as negative numbers (the SQL flips the sign); demographics 
 - **Features** ([`src/features.py`](src/features.py)): 12 behaviour features (recency, how regularly the household buys, recent sales and baskets, discounts, coupons, departments). Demographics are not used by the model: they add nothing and look biased (see below). The features only use weeks ≤ cutoff (tested in [`tests/test_features.py`](tests/test_features.py)).
 - **Preprocessing** (`log1p` for the skewed amounts, then standardizing) sits inside a scikit-learn `Pipeline`, so it is fitted on training data only.
 - **Split by time, not at random**, because the same household appears in several snapshots and in real use we predict the future from the past:
-  - **validation** on weeks 70, 78 and 86: for each week, train on the earlier snapshots only and score that week; a setting's score is the average PR-AUC of the 3 weeks (one week alone is noisy);
-  - **test** on week 94, used once at the end;
-  - the chosen model is then **refit on all snapshots** and saved, so the coupon list uses the most recent data.
+  - **train** on weeks 30 … 78, **validation** on week 86 (choose each model's settings), **test** on week 94, used once at the end;
+  - the final model is then **refit on all snapshots** and saved, so the coupon list uses the most recent data.
 
-**Results on the test week** (2,316 households, churn rate 8.2%), with 95% bootstrap intervals:
+**Results** (test week: 2,316 households, churn rate 8.2%), with 95% bootstrap intervals:
 
-| Model | ROC-AUC | PR-AUC [95% CI] | Precision @10% | Lift @10% |
-|---|:---:|:---:|:---:|:---:|
-| Recency rule *(baseline, no ML)* | 0.763 | 0.234 [0.19, 0.28] | 0.316 | 3.9x |
-| Logistic regression | 0.857 | 0.322 [0.27, 0.39] | 0.372 | 4.6x |
-| **Random forest** *(chosen on validation)* | 0.856 | 0.329 [0.27, 0.40] | 0.364 | 4.5x |
+| Model | Validation PR-AUC [95% CI] | Test ROC-AUC | Test PR-AUC [95% CI] | Precision @10% | Lift @10% |
+|---|:---:|:---:|:---:|:---:|:---:|
+| Recency rule *(baseline, no ML)* | 0.256 [0.21, 0.32] | 0.816 | 0.265 [0.21, 0.32] | 0.320 | 3.9x |
+| **Logistic regression** *(final model)* | 0.296 [0.24, 0.37] | 0.857 | 0.326 [0.27, 0.39] | 0.355 | 4.3x |
+| Random forest | 0.322 [0.26, 0.40] | 0.855 | 0.330 [0.27, 0.40] | 0.359 | 4.4x |
 
 LightGBM was tried too and tied with both models, so it was dropped: two models are enough to compare a linear model with a tree model.
 
 > **Why not accuracy?** With 8% churners, predicting "no churn" for everyone already scores 92% accuracy. PR-AUC and precision in the top 10% (the coupon budget) show what matters.
 
-All ML models beat the recency rule, and they are tied with each other (their intervals overlap), so I do not claim one is "the best".
+Both models beat the recency rule, and they are tied with each other (their intervals overlap on validation and on test).
+So I keep **logistic regression**: its probabilities are as well calibrated as the forest's (this matters because the coupon list multiplies them by sales), and its coefficients explain the risk directly.
 Contacting the top **10%** reaches **44%** of all churners; the top 20% reaches 68%.
 
 **Explainability and experiments** ([notebook 03](notebooks/03_explain_and_business.ipynb), [notebook 04](notebooks/04_experiments.ipynb)):
@@ -101,7 +101,7 @@ Contacting the top **10%** reaches **44%** of all churners; the top 20% reaches 
 
 | Question | What I tried | Result | Decision |
 |---|---|---|---|
-| Which model? | logistic, random forest, small grid each | close to each other, all beat the baseline | keep the one chosen on validation |
+| Which model? | logistic, random forest, small grid each | tied, both beat the baseline | logistic regression: as good, easier to explain |
 | Class imbalance? | `class_weight="balanced"` | no ranking gain; mean predicted churn goes from 7% to 29% | train on the real data, use PR-AUC / top-k |
 | Which threshold? | 0.5, best F1, top 10% | 0.5 flags nobody | top-k for a fixed budget |
 | Need demographics? | validate with / without | 0.348 vs 0.349 | behaviour carries the signal |
