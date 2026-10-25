@@ -39,6 +39,7 @@ CATEGORICAL_DEMOGRAPHICS = ["age_group", "homeowner"]
 
 
 def active_weeks(weekly: pd.DataFrame) -> pd.DataFrame:
+    """Household-weeks with net sales > 0: a week with only returns is not a purchase."""
     return weekly[weekly["net_sales"] > 0]
 
 
@@ -69,21 +70,21 @@ def build_features(weekly: pd.DataFrame, cutoff: int) -> pd.DataFrame:
     last4 = hist[hist["week_no"] > cutoff - 4]
     last12 = hist[hist["week_no"] > cutoff - 12]
 
-    g = hist.groupby("household_key")
+    all_weeks = hist.groupby("household_key")
     feats = pd.DataFrame({
-        "recency_weeks": cutoff - g["week_no"].max(),
-        "tenure_weeks": cutoff - g["week_no"].min() + 1,
+        "recency_weeks": cutoff - all_weeks["week_no"].max(),
+        "tenure_weeks": cutoff - all_weeks["week_no"].min() + 1,
     })
-    feats["active_share"] = g["week_no"].nunique() / feats["tenure_weeks"]
+    feats["active_share"] = all_weeks["week_no"].nunique() / feats["tenure_weeks"]
     feats["active_weeks_4w"] = last4.groupby("household_key").size()
 
-    g12 = last12.groupby("household_key")
-    feats["active_weeks_12w"] = g12.size()
-    feats["baskets_12w"] = g12["n_baskets"].sum()
-    feats["sales_12w"] = g12["net_sales"].sum()
-    feats["discount_12w"] = g12["discount_amount"].sum().clip(lower=0)
-    feats["coupon_items_12w"] = g12["n_coupon_items"].sum()
-    feats["avg_departments_12w"] = g12["n_departments"].mean()
+    weeks_12 = last12.groupby("household_key")
+    feats["active_weeks_12w"] = weeks_12.size()
+    feats["baskets_12w"] = weeks_12["n_baskets"].sum()
+    feats["sales_12w"] = weeks_12["net_sales"].sum()
+    feats["discount_12w"] = weeks_12["discount_amount"].sum().clip(lower=0)     # < 0 only by rounding noise
+    feats["coupon_items_12w"] = weeks_12["n_coupon_items"].sum()
+    feats["avg_departments_12w"] = weeks_12["n_departments"].mean()
 
     # Households with no purchase in a window get NaN from the groupby above: that means 0
     window_cols = ["active_weeks_4w", "active_weeks_12w", "baskets_12w", "sales_12w",
@@ -113,21 +114,24 @@ def build_model_table(weekly: pd.DataFrame, demographics: pd.DataFrame) -> pd.Da
 
 
 def build_scoring_table(weekly: pd.DataFrame, cutoff: int) -> pd.DataFrame:
-    """Features for the households at risk at `cutoff`, without a label (the future is unknown): used to score new data."""
+    """Features of the households at risk at `cutoff`, without a label (the future is unknown): to score new weeks."""
     households = pd.DataFrame({"household_key": at_risk_households(weekly, cutoff)})
     return households.merge(build_features(weekly, cutoff), on="household_key", how="left")
 
 
 def load_inputs():
+    """The household x week activity table and the demographics, both written by python -m src.data."""
     weekly = pd.read_csv(PROCESSED_DIR / "weekly_activity.csv")
     demographics = pd.read_csv(PROCESSED_DIR / "household_demographics.csv")
     return weekly, demographics
 
 
 def main():
+    """Build the model table (all snapshots) and save it to data/processed/model_table.csv."""
     table = build_model_table(*load_inputs())
     table.to_csv(PROCESSED_DIR / "model_table.csv", index=False)
-    print(table.groupby("cutoff_week")["churn"].agg(households="size", churn_rate="mean").round(3))
+    per_snapshot = table.groupby("cutoff_week")["churn"].agg(households="size", churn_rate="mean")
+    print(per_snapshot.round(3))
     print(f"Wrote {len(table):,} rows to data/processed/model_table.csv")
 
 

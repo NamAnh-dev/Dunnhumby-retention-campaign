@@ -30,6 +30,7 @@ def run_sql(sql_file, con) -> pd.DataFrame:
 
 
 def load_transactions(raw_dir=RAW_DIR) -> pd.DataFrame:
+    """The raw transaction lines with lower-case column names (notebook 01 uses them for the data-quality checks)."""
     df = pd.read_csv(raw_dir / "transaction_data.csv")
     df.columns = df.columns.str.lower()
     return df
@@ -48,6 +49,7 @@ def quality_report(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def main():
+    """Run every SQL file in sql/ on the raw CSVs and save each result to data/processed/."""
     PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
     con = connect()
     for sql_file in sorted(SQL_DIR.glob("*.sql")):
