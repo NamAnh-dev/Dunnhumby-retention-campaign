@@ -8,4 +8,5 @@ seaborn==0.13.2
 shap==0.54.1
 joblib==1.6.0
 pytest==9.1.1
-ipykernel==7.4.0
+ipykernel==7.4.0     # run the notebooks
+nbconvert==7.17.2    # re-run them from the command line: jupyter nbconvert --execute
