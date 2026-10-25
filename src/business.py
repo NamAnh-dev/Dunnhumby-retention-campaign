@@ -32,7 +32,7 @@ def targeting_table(y, score, sales, fractions=(0.05, 0.10, 0.20, 0.30, 0.50, 1.
     """One row per share of households targeted (highest score first): churners reached and their sales at risk."""
     y, sales = np.asarray(y), np.asarray(sales, dtype=float)
     churner_sales = y * sales                      # 0 for households that do not churn
-    order = np.argsort(-np.asarray(score))
+    order = np.argsort(-np.asarray(score), kind="stable")   # stable: ties keep the table order on every machine
     rows = []
     for f in fractions:
         top = order[: max(1, int(len(y) * f))]

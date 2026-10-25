@@ -4,7 +4,7 @@ import pytest
 
 from src.config import PREDICTION_WEEKS, TEST_CUTOFF, VALID_CUTOFF
 from src.features import FEATURES
-from src.train import evaluate, make_preprocessor, precision_at_top, time_split
+from src.train import RecencyRule, evaluate, make_preprocessor, precision_at_top, time_split
 
 
 def test_precision_at_top():
@@ -12,6 +12,7 @@ def test_precision_at_top():
     score = [0.9, 0.8, 0.7, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
     assert precision_at_top(y, score, fraction=0.2) == 0.5      # top 2: one churner
     assert precision_at_top(y, score, fraction=0.3) == 2 / 3
+    assert precision_at_top([1, 0, 0, 0], [0.5] * 4, fraction=0.25) == 1.0   # a full tie keeps the table order
 
 
 def test_lift_of_a_perfect_model():
@@ -20,6 +21,16 @@ def test_lift_of_a_perfect_model():
     result = evaluate(y, score)
     assert result["roc_auc"] == 1.0
     assert result["lift_top10"] == 10.0  # base rate 10%, precision in the top 10% = 100%
+
+
+def test_recency_rule_breaks_ties_with_active_weeks():
+    X = pd.DataFrame({"recency_weeks":    [2, 2, 3, 0],
+                      "active_weeks_12w": [6, 1, 9, 1]})
+    risk = RecencyRule().predict_proba(X)[:, 1]
+    assert risk[1] > risk[0]           # same recency: fewer purchase weeks = riskier
+    assert risk[2] > risk[1]           # recency still comes first
+    assert risk[0] > risk[3]           # even a very light buyer with recency 0 stays below recency 2
+    assert (risk >= 0).all() and (risk < 1).all()
 
 
 def test_time_split_train_valid_test():
