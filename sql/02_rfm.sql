@@ -1,10 +1,14 @@
 -- RFM segmentation over the whole period (descriptive only: it uses future data, so it is NOT a model feature).
--- recency  = weeks since the last active week (lower is better)
+-- recency   = weeks since the last active week (lower is better)
 -- frequency = number of active weeks
--- monetary = total net sales
--- Each is split into 5 equal-sized groups with NTILE (5 = best).
--- Many households have the same value (e.g. recency 0), so household_key breaks the ties:
--- without it, NTILE puts tied households in a different group on every run.
+-- monetary  = total net sales
+-- Segments are defined by R and F (behaviour); M (sales) is used afterwards to check how much each segment is worth.
+--
+-- R score: fixed week thresholds, because about half of the households bought in the very last week, so 5 equal-sized
+-- groups (NTILE) would give households with the same recency different scores. 8+ silent weeks = the churn definition.
+--   0 weeks -> 5,  1 -> 4,  2-3 -> 3,  4-7 -> 2,  8+ -> 1
+-- F score: 5 equal-sized groups with NTILE (5 = most active weeks). Frequency has ~100 different values, so few
+-- households tie; household_key breaks those ties, so a household gets the same group on every run.
 
 WITH household_week AS (
     SELECT household_key, week_no, SUM(sales_value) AS net_sales
@@ -24,9 +28,13 @@ rfm AS (
 scored AS (
     SELECT
         *,
-        NTILE(5) OVER (ORDER BY recency_weeks DESC, household_key) AS r_score,
-        NTILE(5) OVER (ORDER BY frequency_weeks, household_key)    AS f_score,
-        NTILE(5) OVER (ORDER BY monetary, household_key)           AS m_score
+        CASE WHEN recency_weeks = 0 THEN 5
+             WHEN recency_weeks = 1 THEN 4
+             WHEN recency_weeks <= 3 THEN 3
+             WHEN recency_weeks <= 7 THEN 2
+             ELSE 1
+        END                                                     AS r_score,
+        NTILE(5) OVER (ORDER BY frequency_weeks, household_key) AS f_score
     FROM rfm
 )
 SELECT
